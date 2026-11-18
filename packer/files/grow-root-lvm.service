@@ -1,0 +1,12 @@
+[Unit]
+Description=Grow the LVM root filesystem to fill the disk
+Documentation=file:///usr/local/sbin/grow-root-lvm
+After=local-fs.target
+ConditionVirtualization=vm
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/grow-root-lvm
+
+[Install]
+WantedBy=multi-user.target

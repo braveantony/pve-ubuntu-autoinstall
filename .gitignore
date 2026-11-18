@@ -1,0 +1,12 @@
+# Secrets and local state: never commit
+.env
+*.auto.pkrvars.hcl
+tofu/terraform.tfvars
+tofu/secrets.auto.tfvars
+tofu/*.tfstate
+tofu/*.tfstate.*
+tofu/.terraform/
+tofu/.terraform.tfstate.lock.info
+
+# Local caches (plugins, downloaded docs, build keys)
+.cache/

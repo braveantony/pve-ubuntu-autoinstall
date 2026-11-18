@@ -1,0 +1,53 @@
+#!/bin/sh
+# Grow the root filesystem to fill the virtual disk when root is on LVM.
+#
+# cloud-init's growpart/resizefs only handle a root filesystem that sits
+# directly on a partition. With root on LVM the chain has four links, so do
+# them all: partition -> physical volume -> logical volume -> filesystem.
+#
+# Runs on every boot and is a no-op when there is nothing to grow, so
+# enlarging the disk in PVE and rebooting is enough.
+set -eu
+
+root_dev=$(findmnt -n -o SOURCE /)
+
+# Only act when / is an LVM logical volume.
+if ! lvs "$root_dev" >/dev/null 2>&1; then
+    echo "root ($root_dev) is not an LVM logical volume; nothing to do"
+    exit 0
+fi
+
+vg=$(lvs --noheadings -o vg_name "$root_dev" | tr -d ' ')
+pv_count=$(pvs --noheadings -o pv_name -S "vg_name=$vg" | wc -l)
+if [ "$pv_count" -ne 1 ]; then
+    echo "volume group $vg has $pv_count physical volumes; refusing to guess"
+    exit 0
+fi
+
+pv=$(pvs --noheadings -o pv_name -S "vg_name=$vg" | tr -d ' ')
+pv_name=$(basename "$pv")
+if [ ! -e "/sys/class/block/$pv_name/partition" ]; then
+    echo "physical volume $pv is not a partition; nothing to grow"
+    exit 0
+fi
+part_num=$(cat "/sys/class/block/$pv_name/partition")
+# -d: only the partition itself, not the LVs stacked on top of it.
+disk="/dev/$(lsblk -n -d -o PKNAME "$pv")"
+
+# growpart exits 1 with "NOCHANGE" when the partition already fills the disk.
+rc=0
+out=$(growpart "$disk" "$part_num" 2>&1) || rc=$?
+echo "$out"
+if [ "$rc" -ne 0 ] && ! echo "$out" | grep -q NOCHANGE; then
+    exit "$rc"
+fi
+
+pvresize "$pv"
+
+free_extents=$(vgs --noheadings -o vg_free_count "$vg" | tr -d ' ')
+if [ "$free_extents" -gt 0 ]; then
+    # -r also resizes the filesystem inside the logical volume.
+    lvextend -r -l +100%FREE "$root_dev"
+else
+    echo "volume group $vg has no free extents; root is already at full size"
+fi

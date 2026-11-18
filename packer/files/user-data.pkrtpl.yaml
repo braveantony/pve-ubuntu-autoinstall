@@ -1,0 +1,119 @@
+#cloud-config
+# Subiquity autoinstall answers for the Ubuntu Server 26.04 template.
+# Rendered by Packer (templatefile); values in dollar-brace come from
+# packer/variables.pkr.hcl.
+autoinstall:
+  version: 1
+
+  # Same answers a manual install with all defaults gives on this site.
+  locale: C.UTF-8
+  keyboard:
+    layout: us
+  timezone: Etc/UTC
+  refresh-installer:
+    update: false
+  source:
+    id: ubuntu-server
+  kernel:
+    package: linux-generic
+  updates: security
+
+  apt:
+    mirror-selection:
+      primary:
+        - uri: ${apt_mirror}
+
+  # Build-time address only. seal.sh removes the resulting netplan file, so
+  # clones take their network settings from the PVE cloud-init drive.
+  network:
+    version: 2
+    ethernets:
+      ens18:
+        dhcp4: false
+        dhcp6: false
+        addresses:
+          - ${build_ip_cidr}
+        routes:
+          - to: default
+            via: ${build_gateway}
+        nameservers:
+          addresses:
+            - ${build_dns}
+
+  # Disk layout. To split /var, /home and so on into their own logical
+  # volumes, add more lvm_partition + format + mount triples and give
+  # ubuntu-lv a fixed size. If you do, also revisit files/grow-root-lvm, which
+  # hands ALL new space to the root LV.
+  storage:
+    swap:
+      size: 0
+    config:
+      - id: disk0
+        type: disk
+        match:
+          size: largest
+        ptable: gpt
+        wipe: superblock-recursive
+        preserve: false
+        grub_device: true
+      # 1 MiB BIOS boot partition: GRUB needs it to boot a GPT disk on SeaBIOS.
+      - id: part-bios
+        type: partition
+        device: disk0
+        number: 1
+        size: 1M
+        flag: bios_grub
+      - id: part-boot
+        type: partition
+        device: disk0
+        number: 2
+        size: 2G
+      - id: fs-boot
+        type: format
+        volume: part-boot
+        fstype: ext4
+      # The LVM physical volume is the LAST partition so it can be grown in
+      # place when a clone is given a bigger disk.
+      - id: part-pv
+        type: partition
+        device: disk0
+        number: 3
+        size: -1
+      - id: vg0
+        type: lvm_volgroup
+        name: ubuntu-vg
+        devices:
+          - part-pv
+      - id: lv-root
+        type: lvm_partition
+        volgroup: vg0
+        name: ubuntu-lv
+        size: -1
+      - id: fs-root
+        type: format
+        volume: lv-root
+        fstype: ext4
+      - id: mount-root
+        type: mount
+        device: fs-root
+        path: /
+      - id: mount-boot
+        type: mount
+        device: fs-boot
+        path: /boot
+
+  # Temporary account Packer logs in with. seal.sh deletes it.
+  identity:
+    hostname: ${hostname}
+    username: ${build_username}
+    password: '${build_password_hash}'
+
+  ssh:
+    install-server: true
+    allow-pw: true
+
+  packages:
+    - qemu-guest-agent
+    - cloud-guest-utils
+
+  shutdown: reboot
