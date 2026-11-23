@@ -67,7 +67,8 @@ resource "proxmox_virtual_environment_vm" "vm" {
 
     user_account {
       username = each.value.username
-      password = var.vm_passwords[each.key]
+      # A SHA-512 crypt hash, not the password itself (see variables.tf).
+      password = var.vm_password_hashes[each.key]
       keys     = var.ssh_public_keys
     }
   }

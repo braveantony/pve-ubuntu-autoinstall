@@ -13,6 +13,9 @@ action="${1:-build}"
 [ -f "$repo/.env" ] || { echo "missing $repo/.env (copy env.example and fill it in)" >&2; exit 1; }
 set -a; . "$repo/.env"; set +a
 
+# One source of truth for the template's VMID: TEMPLATE_VMID in .env. It is
+# passed to Packer here and to OpenTofu in scripts/tofu.sh, overriding the
+# defaults in the HCL variable files.
 template_vmid="${TEMPLATE_VMID:-605}"
 
 # Packer cannot build over an existing VM, and this script never deletes one
@@ -22,7 +25,7 @@ if [ "$action" = build ]; then
     -H "Authorization: PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_SECRET}" \
     "${PVE_ENDPOINT}/api2/json/nodes/${PVE_NODE}/qemu/${template_vmid}/status/current")
   case "$http" in
-    200) echo "VMID ${template_vmid} already exists on ${PVE_NODE}. Remove it yourself (on the node: qm destroy ${template_vmid}) or set TEMPLATE_VMID to a free ID, then run this again." >&2; exit 1 ;;
+    200) echo "VMID ${template_vmid} already exists on ${PVE_NODE}. Check what it is first (on the node: qm config ${template_vmid}). If it is an old template you want to rebuild, remove it yourself (qm destroy ${template_vmid}); otherwise set TEMPLATE_VMID in .env to a free ID. Then run this again." >&2; exit 1 ;;
     500|404) ;; # PVE answers 500 "does not exist" for a free VMID
     *) echo "cannot query the PVE API (HTTP ${http}); check .env" >&2; exit 1 ;;
   esac

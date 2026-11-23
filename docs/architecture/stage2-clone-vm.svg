@@ -1,0 +1,103 @@
+<svg font-family="&quot;Noto Sans CJK TC&quot;, &quot;Noto Sans TC&quot;, &quot;PingFang TC&quot;, &quot;Microsoft JhengHei&quot;, sans-serif" xmlns="http://www.w3.org/2000/svg" width="1100" height="1280" viewBox="0 0 1100 1280">
+  <title>複製 VM</title>
+  <defs>
+    <marker id="tip335e9a" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#335e9a" />
+    </marker>
+    <marker id="tip167064" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#167064" />
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1100" height="1280" fill="white" stroke="none" stroke-width="2" />
+  <rect x="18" y="18" width="174" height="1182" fill="#f7f9fb" stroke="#b2bfcb" stroke-width="2" rx="10" />
+  <text x="38" y="58" text-anchor="start" fill="#26374a" font-size="26" font-weight="700">工作機</text>
+  <rect x="247" y="18" width="835" height="1182" fill="#f7f9fb" stroke="#b2bfcb" stroke-width="2" rx="10" />
+  <text x="267" y="58" text-anchor="start" fill="#26374a" font-size="26" font-weight="700">PVE 節點</text>
+  <rect x="36" y="112" width="146" height="1055" fill="white" stroke="#657589" stroke-width="2" rx="5" stroke-dasharray="7 5" />
+  <text x="109" y="156" text-anchor="middle" fill="#26374a" font-size="24" font-weight="500">OpenTofu</text>
+  <rect x="263" y="112" width="132" height="1055" fill="white" stroke="#657589" stroke-width="2" rx="5" />
+  <text x="329" y="155" text-anchor="middle" fill="#26374a" font-size="22" font-weight="500">PVE API</text>
+  <path d="M182 185 H263" fill="none" stroke="#167064" stroke-width="3" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <rect x="643" y="61" width="176" height="66" fill="#e7effc" stroke="#335e9a" stroke-width="2" rx="5" />
+  <rect x="648" y="66" width="166" height="56" fill="none" stroke="#335e9a" stroke-width="2" rx="2" />
+  <text x="731.0" y="100.0" text-anchor="middle" fill="#26374a" font-size="20" font-weight="500">範本 605</text>
+  <path d="M329 112 V91 H643" fill="none" stroke="#167064" stroke-width="3" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <path d="M731 127 V193" fill="none" stroke="#167064" stroke-width="5" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <circle cx="731" cy="158" r="15" fill="white" />
+  <text x="731" y="167" text-anchor="middle" fill="#167064" font-size="28" font-weight="500">①</text>
+  <rect x="465" y="193" width="595" height="985" fill="white" stroke="#657589" stroke-width="2" rx="5" />
+  <text x="492" y="236" text-anchor="start" fill="#26374a" font-size="26" font-weight="700">VM</text>
+  <rect x="810" y="238" width="220" height="54" fill="white" stroke="#657589" stroke-width="2" rx="5" />
+  <text x="920.0" y="271.0" text-anchor="middle" fill="#26374a" font-size="20" font-weight="500">CPU · 記憶體</text>
+  <path d="M395 320 H973 V560" fill="none" stroke="#167064" stroke-width="3" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <circle cx="430" cy="320" r="15" fill="white" />
+  <text x="430" y="329" text-anchor="middle" fill="#167064" font-size="28" font-weight="500">②</text>
+  <path d="M920 320 V292" fill="none" stroke="#167064" stroke-width="3" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <path d="M512 340 h288 v54 h-300 v-42 Z" fill="#fff6dd" stroke="#94763a" stroke-width="2" />
+  <text x="650.0" y="373.0" text-anchor="middle" fill="#26374a" font-size="20" font-weight="500">cloud-init 光碟機</text>
+  <path d="M395 367 H500" fill="none" stroke="#167064" stroke-width="3" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <circle cx="430" cy="367" r="15" fill="white" />
+  <text x="430" y="376" text-anchor="middle" fill="#167064" font-size="28" font-weight="500">③</text>
+  <path d="M395 427 H465" fill="none" stroke="#167064" stroke-width="5" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <circle cx="430" cy="427" r="15" fill="white" />
+  <text x="430" y="436" text-anchor="middle" fill="#167064" font-size="28" font-weight="500">④</text>
+  <text x="492" y="434" text-anchor="start" fill="#26374a" font-size="20" font-weight="500">啟動</text>
+  <path d="M665 394 V445" fill="none" stroke="#167064" stroke-width="4" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <circle cx="665" cy="419" r="15" fill="white" />
+  <text x="665" y="428" text-anchor="middle" fill="#167064" font-size="28" font-weight="500">⑤</text>
+  <rect x="573" y="445" width="184" height="54" fill="white" stroke="#657589" stroke-width="2" rx="5" />
+  <text x="665.0" y="478.0" text-anchor="middle" fill="#26374a" font-size="20" font-weight="500">cloud-init</text>
+  <text x="499" y="541" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">scsi0</text>
+  <rect x="499" y="560" width="58" height="207" fill="#f5f8fb" stroke="#657589" stroke-width="2" />
+  <text x="528.0" y="665" text-anchor="middle" fill="#26374a" font-size="18" font-weight="500">1M</text>
+  <rect x="557" y="560" width="90" height="207" fill="#f5f8fb" stroke="#657589" stroke-width="2" />
+  <text x="602.0" y="665" text-anchor="middle" fill="#26374a" font-size="18" font-weight="500">/boot</text>
+  <rect x="913" y="560" width="120" height="207" fill="none" stroke="#657589" stroke-width="2" stroke-dasharray="7 5" />
+  <rect x="647" y="560" width="266" height="207" fill="#deebf5" stroke="#657589" stroke-width="2" />
+  <text x="663" y="592" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">PV</text>
+  <rect x="655" y="607" width="250" height="156" fill="#d1e4ec" stroke="#657589" stroke-width="2" />
+  <text x="671" y="639" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">ubuntu-vg</text>
+  <rect x="663" y="654" width="234" height="105" fill="#c4dddf" stroke="#657589" stroke-width="2" />
+  <text x="679" y="686" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">ubuntu-lv</text>
+  <rect x="671" y="701" width="218" height="51" fill="#f2faf8" stroke="#657589" stroke-width="2" />
+  <text x="780.0" y="732" text-anchor="middle" fill="#26374a" font-size="18" font-weight="500">/</text>
+  <text x="499" y="844" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">scsi0</text>
+  <rect x="499" y="863" width="58" height="207" fill="#f5f8fb" stroke="#657589" stroke-width="2" />
+  <text x="528.0" y="968" text-anchor="middle" fill="#26374a" font-size="18" font-weight="500">1M</text>
+  <rect x="557" y="863" width="90" height="207" fill="#f5f8fb" stroke="#657589" stroke-width="2" />
+  <text x="602.0" y="968" text-anchor="middle" fill="#26374a" font-size="18" font-weight="500">/boot</text>
+  <rect x="647" y="863" width="386" height="207" fill="#deebf5" stroke="#657589" stroke-width="2" />
+  <text x="663" y="895" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">PV</text>
+  <rect x="655" y="910" width="370" height="156" fill="#d1e4ec" stroke="#657589" stroke-width="2" />
+  <text x="671" y="942" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">ubuntu-vg</text>
+  <rect x="663" y="957" width="354" height="105" fill="#c4dddf" stroke="#657589" stroke-width="2" />
+  <text x="679" y="989" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">ubuntu-lv</text>
+  <rect x="671" y="1004" width="338" height="51" fill="#f2faf8" stroke="#657589" stroke-width="2" />
+  <text x="840.0" y="1035" text-anchor="middle" fill="#26374a" font-size="18" font-weight="500">/</text>
+  <path d="M745 767 V863" fill="none" stroke="#167064" stroke-width="4" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <circle cx="745" cy="815" r="15" fill="white" />
+  <text x="745" y="824" text-anchor="middle" fill="#167064" font-size="28" font-weight="500">⑥</text>
+  <text x="777" y="822" text-anchor="start" fill="#26374a" font-size="20" font-weight="500">grow-root-lvm</text>
+  <rect x="504" y="1109" width="246" height="54" fill="white" stroke="#657589" stroke-width="2" rx="5" />
+  <text x="627.0" y="1142.0" text-anchor="middle" fill="#26374a" font-size="20" font-weight="500">qemu-guest-agent</text>
+  <path d="M504 1136 H395" fill="none" stroke="#167064" stroke-width="3" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <path d="M263 1136 H182" fill="none" stroke="#167064" stroke-width="3" stroke-linejoin="round" marker-end="url(#tip167064)" />
+  <circle cx="430" cy="1136" r="15" fill="white" />
+  <text x="430" y="1145" text-anchor="middle" fill="#167064" font-size="28" font-weight="500">⑦</text>
+  <text x="220" y="1119" text-anchor="middle" fill="#26374a" font-size="18" font-weight="500">IP</text>
+  <rect x="28" y="1232" width="36" height="25" fill="white" stroke="#657589" stroke-width="2" rx="5" stroke-dasharray="7 5" />
+  <text x="80" y="1252" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">容器</text>
+  <rect x="168" y="1232" width="36" height="25" fill="white" stroke="#657589" stroke-width="2" rx="5" />
+  <text x="220" y="1252" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">VM</text>
+  <rect x="290" y="1232" width="36" height="25" fill="#e7effc" stroke="#335e9a" stroke-width="2" rx="5" />
+  <rect x="295" y="1237" width="26" height="15" fill="none" stroke="#335e9a" stroke-width="2" rx="2" />
+  <text x="342" y="1252" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">範本</text>
+  <path d="M437 1232 h24 v25 h-36 v-13 Z" fill="#fff6dd" stroke="#94763a" stroke-width="2" />
+  <text x="477" y="1252" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">光碟</text>
+  <rect x="565" y="1232" width="7" height="25" fill="#f5f8fb" stroke="#657589" stroke-width="2" />
+  <rect x="572" y="1232" width="10" height="25" fill="#f5f8fb" stroke="#657589" stroke-width="2" />
+  <rect x="582" y="1232" width="19" height="25" fill="#deebf5" stroke="#657589" stroke-width="2" />
+  <text x="617" y="1252" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">磁碟 / LVM</text>
+  <rect x="753" y="1232" width="36" height="25" fill="none" stroke="#657589" stroke-width="2" stroke-dasharray="7 5" />
+  <text x="805" y="1252" text-anchor="start" fill="#26374a" font-size="18" font-weight="500">未配置</text>
+</svg>

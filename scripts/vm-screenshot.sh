@@ -5,21 +5,25 @@
 #
 #   scripts/vm-screenshot.sh <vmid> <out.png>
 #
-# Needs SSH + sudo on the PVE node (PVE_SSH, default bigred@192.168.11.201)
-# and python3 locally (standard library only).
+# Needs SSH to the PVE node (PVE_SSH in .env, root or a user with passwordless
+# sudo) and python3 locally (standard library only).
 set -euo pipefail
 
 vmid="${1:?usage: $0 <vmid> <out.png>}"
 out="${2:?usage: $0 <vmid> <out.png>}"
-node_ssh="${PVE_SSH:-bigred@192.168.11.201}"
-node="${PVE_NODE:-node5}"
+repo=$(cd "$(dirname "$0")/.." && pwd)
+[ -f "$repo/.env" ] && { set -a; . "$repo/.env"; set +a; }
+node_ssh="${PVE_SSH:?set PVE_SSH in .env, for example root@192.168.11.201}"
+node="${PVE_NODE:?set PVE_NODE in .env}"
 remote="/tmp/vm-${vmid}-screen.$$.ppm"
 
 ssh -o BatchMode=yes "$node_ssh" \
-  "sudo -n pvesh create /nodes/${node}/qemu/${vmid}/monitor --command 'screendump ${remote}' >/dev/null && sleep 1 && sudo -n cat ${remote} && sudo -n rm -f ${remote}" |
+  "S=; [ \"\$(id -u)\" -eq 0 ] || S='sudo -n'; \$S pvesh create /nodes/${node}/qemu/${vmid}/monitor --command 'screendump ${remote}' >/dev/null && sleep 1 && \$S cat ${remote} && \$S rm -f ${remote}" |
 python3 -c '
 import sys, zlib, struct
 data = sys.stdin.buffer.read()
+if not data.startswith(b"P6"):
+    sys.exit("no screen dump received: is the VM running, and can PVE_SSH run pvesh?")
 # Binary PPM (P6): magic, width, height, maxval, then raw RGB.
 fields, pos = [], 0
 while len(fields) < 4:

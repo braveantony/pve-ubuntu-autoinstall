@@ -20,8 +20,9 @@ variable "pve_token_secret" {
 
 # --- Template -----------------------------------------------------------------
 variable "template_vmid" {
-  type    = number
-  default = 605
+  type        = number
+  default     = 605
+  description = "Do not edit here: scripts/build-template.sh always overrides this with TEMPLATE_VMID from .env."
 }
 
 variable "template_name" {

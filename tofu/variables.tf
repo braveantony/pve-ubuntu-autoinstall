@@ -22,7 +22,7 @@ variable "pve_token_secret" {
 variable "template_vmid" {
   type        = number
   default     = 605
-  description = "Template built by packer/ (scripts/build-template.sh)."
+  description = "Template built by packer/. Do not edit here: scripts/tofu.sh always overrides this with TEMPLATE_VMID from .env."
 }
 
 variable "vm_storage" {
@@ -64,8 +64,13 @@ variable "vms" {
   }))
 }
 
-variable "vm_passwords" {
-  description = "Login password per VM, keyed by VM name. Keep in secrets.auto.tfvars (git-ignored)."
+variable "vm_password_hashes" {
+  description = "SHA-512 crypt hash of each VM's login password, keyed by VM name. Generate with scripts/hash-password.sh and keep in secrets.auto.tfvars (git-ignored). PVE passes a crypt hash to cloud-init unchanged, so no plaintext password is ever written to this repo, the state file or the PVE VM config."
   type        = map(string)
   sensitive   = true
+
+  validation {
+    condition     = alltrue([for h in values(var.vm_password_hashes) : can(regex("^\\$6\\$[^$]+\\$[./A-Za-z0-9]{86}$", h))])
+    error_message = "Every value must be a SHA-512 crypt hash ($6$<salt>$<86 characters>), not a plaintext password. Generate one with scripts/hash-password.sh."
+  }
 }

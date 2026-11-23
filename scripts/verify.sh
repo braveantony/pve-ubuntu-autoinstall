@@ -6,11 +6,13 @@
 #   scripts/verify.sh
 #
 # Needs: the VMs applied (scripts/tofu.sh apply), SSH key login to them from
-# this machine, and SSH + sudo on the PVE node for the hardware comparison.
+# this machine, and SSH to the PVE node (PVE_SSH in .env, root or a user with
+# passwordless sudo) for the hardware comparison.
 set -uo pipefail
 
 repo=$(cd "$(dirname "$0")/.." && pwd)
-node_ssh="${PVE_SSH:-bigred@192.168.11.201}"
+[ -f "$repo/.env" ] && { set -a; . "$repo/.env"; set +a; }
+node_ssh="${PVE_SSH:?set PVE_SSH in .env, for example root@192.168.11.201}"
 reference_vmid="${REFERENCE_VMID:-604}" # hand-built template to compare hardware with
 build_username="${BUILD_USERNAME:-packer}"
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no
@@ -27,11 +29,15 @@ vms_json=$("$repo/scripts/tofu.sh" output -json vms) || { echo "cannot read tofu
 
 # Hardware keys a hand-built VM has; values that are per-VM by nature are
 # not compared (name, sizes, MAC, UUIDs).
+# Works whether PVE_SSH logs in as root or as a user with passwordless sudo.
+qm_config() {
+  ssh "${ssh_opts[@]}" "$node_ssh" "if [ \"\$(id -u)\" -eq 0 ]; then qm config $1; else sudo -n qm config $1; fi"
+}
 hw_keys() {
-  ssh "${ssh_opts[@]}" "$node_ssh" "sudo -n qm config $1" |
+  qm_config "$1" |
     sed -E 's/^([a-z0-9]+): .*/\1/' | grep -vE '^(template|description|tags)$' | sort
 }
-hw_value() { ssh "${ssh_opts[@]}" "$node_ssh" "sudo -n qm config $1" | sed -n "s/^$2: //p"; }
+hw_value() { qm_config "$1" | sed -n "s/^$2: //p"; }
 
 ref_keys=$(hw_keys "$reference_vmid")
 
@@ -116,5 +122,5 @@ echo
 echo "Result: $pass passed, $fail failed"
 echo "Still to check by hand in the PVE web console (noVNC) of each VM:"
 echo "  - the login prompt is shown on the graphical console (tty1)"
-echo "  - logging in there with the password from secrets.auto.tfvars works"
+echo "  - logging in there with the password you hashed for secrets.auto.tfvars works"
 [ "$fail" -eq 0 ]
