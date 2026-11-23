@@ -1,4 +1,4 @@
-# --- Proxmox connection (from .env, passed in as TF_VAR_*) --------------------
+# --- Proxmox connection (overlay env, passed in as TF_VAR_*) -----------------
 variable "pve_endpoint" {
   type        = string
   description = "PVE API base URL, for example https://192.168.11.201:8006"
@@ -18,31 +18,33 @@ variable "pve_token_secret" {
   sensitive = true
 }
 
-# --- Site defaults ------------------------------------------------------------
 variable "template_vmid" {
   type        = number
-  default     = 605
-  description = "Template built by packer/. Do not edit here: scripts/tofu.sh always overrides this with TEMPLATE_VMID from .env."
+  description = "Template built by base/packer. TEMPLATE_VMID in the overlay env."
 }
 
+# --- Site (overlay site.hcl, shared with Packer) ---------------------------
 variable "vm_storage" {
-  type    = string
-  default = "vmdata"
+  type        = string
+  description = "Storage for VM disks."
+}
+
+variable "iso_storage" {
+  type        = string
+  default     = ""
+  description = "Only used by Packer; declared here so both tools can read the same site.hcl."
 }
 
 variable "bridge" {
-  type    = string
-  default = "vmbr1"
+  type = string
 }
 
 variable "gateway" {
-  type    = string
-  default = "192.168.11.254"
+  type = string
 }
 
 variable "dns_servers" {
-  type    = list(string)
-  default = ["192.168.11.2"]
+  type = list(string)
 }
 
 variable "ssh_public_keys" {
@@ -51,7 +53,7 @@ variable "ssh_public_keys" {
   description = "Public keys authorised for every VM's user. scripts/tofu.sh fills this from SSH_PUBLIC_KEY_FILE."
 }
 
-# --- The VMs ------------------------------------------------------------------
+# --- The VMs (overlay vms.tfvars and secrets.tfvars) --------------------------
 variable "vms" {
   description = "VMs to clone from the template, keyed by VM name (which is also the hostname)."
   type = map(object({
@@ -65,7 +67,7 @@ variable "vms" {
 }
 
 variable "vm_password_hashes" {
-  description = "SHA-512 crypt hash of each VM's login password, keyed by VM name. Generate with scripts/hash-password.sh and keep in secrets.auto.tfvars (git-ignored). PVE passes a crypt hash to cloud-init unchanged, so no plaintext password is ever written to this repo, the state file or the PVE VM config."
+  description = "SHA-512 crypt hash of each VM's login password, keyed by VM name. Generate with scripts/hash-password.sh and keep in the overlay's secrets.tfvars (git-ignored). PVE passes a crypt hash to cloud-init unchanged, so no plaintext password is ever written to this repo, the state file or the PVE VM config."
   type        = map(string)
   sensitive   = true
 

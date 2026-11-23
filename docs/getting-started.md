@@ -8,7 +8,7 @@
 
 1. [準備工作機](#1-準備工作機)
 2. [檢查 PVE 並記下環境](#2-檢查-pve-並記下環境)
-3. [依你的環境修改設定](#3-依你的環境修改設定)
+3. [建立你的 overlay](#3-建立你的-overlay)
 4. [設定 PVE 連線](#4-設定-pve-連線)
 5. [建立範本](#5-建立範本)
 6. [定義 VM](#6-定義-vm)
@@ -34,7 +34,7 @@
 
 手冊裡所有的指令都在工作機上執行。需要在 PVE 節點上執行的指令，都寫成 `ssh root@192.168.11.201 <指令>` 的形式，從工作機送過去。
 
-指令和輸出範例用的是 repo 設定檔的預設值，例如 PVE 節點的 IP 是 `192.168.11.201`。[步驟 2.2](#22-查出環境值) 會帶你查出自己的值。
+指令和輸出範例用的是 repo 裡範例環境的值，例如 PVE 節點的 IP 是 `192.168.11.201`。[步驟 2.2](#22-查出環境值) 會帶你查出自己的值。
 
 ## 1. 準備工作機
 
@@ -219,7 +219,7 @@ ssh root@192.168.11.201 pvesm list local --content iso | grep ubuntu-26.04
 local:iso/ubuntu-26.04-live-server-amd64.iso   iso   iso   2918598656
 ```
 
-第一欄是這張光碟在 PVE 裡的完整名稱，第 3 章會用到。
+第一欄是這張光碟在 PVE 裡的完整名稱，步驟 3.3 會用到。
 
 沒有輸出代表光碟不在裡面。到 PVE 網頁選擇放 ISO 的 storage，在「ISO Images」頁面按「Download from URL」，貼上這個網址：
 
@@ -235,86 +235,68 @@ dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9
 
 這個專案只用 26.04 這張光碟驗證過，之後的小改版（例如 26.04.1）沒有測過。
 
-## 3. 依你的環境修改設定
+## 3. 建立你的 overlay
 
-設定檔裡預先填好的是範例值。這一章要把它們換成你在步驟 2.2 記下的值。你的值和範例值完全相同的話，直接跳到第 4 章。
+repo 分成兩個部分：
 
-要改的檔案有兩個。節點名稱與範本的 VMID 不在這兩個檔案裡，它們在第 4 章填。
+- `base/`：範本與 VM 的定義，所有環境共用，不用修改。
+- `overlays/`：每個子目錄是一個環境（一座 PVE）的設定值，稱為 overlay。`overlays/example` 是範例。
 
-| 檔案 | 用途 |
-|---|---|
-| `packer/variables.pkr.hcl` | 建立範本時用的設定 |
-| `tofu/variables.tf` | 建立 VM 時用的設定 |
+你的環境值全部填在自己的 overlay 裡。這份手冊把它命名為 `lab`，你可以換成其他名稱，之後指令裡的 `lab` 也要跟著換。
 
-### 3.1 修改的方法
+### 3.1 複製範例
 
-兩個檔案的寫法相同。每一項設定是一個 `variable` 區塊，要改的只有區塊裡 `default =` 後面的值。例如把放 VM 磁碟的 storage 從 `vmdata` 改成 `local-lvm`：
-
-```diff
- variable "vm_storage" {
-   type    = string
--  default = "vmdata"
-+  default = "local-lvm"
- }
+```bash
+cp -r overlays/example overlays/lab
 ```
 
-值的寫法有三種，照原本的樣子改就不會錯：
+`overlays/lab` 裡有五個檔案，接下來會依序填寫：
+
+| 檔案 | 內容 | 在哪裡填 |
+|---|---|---|
+| `site.hcl` | storage、橋接器、閘道、DNS | 步驟 3.2 |
+| `template.pkrvars.hcl` | 安裝光碟、建置用的 IP、範本規格 | 步驟 3.3 |
+| `env.example` | PVE 連線資訊與 API 權杖 | 步驟 4.2 |
+| `vms.tfvars` | VM 清單 | 步驟 6.1 |
+| `secrets.tfvars.example` | 每台 VM 的密碼雜湊 | 步驟 6.2 |
+
+這些檔案裡，值的寫法有三種，照原本的樣子改就不會錯：
 
 - 文字：前後要有雙引號，例如 `"local-lvm"`。
 - 數字：不加引號，例如 `4`。
 - 清單：用中括號包住，例如 `["192.168.11.2"]`；有兩筆時寫成 `["192.168.11.2", "8.8.8.8"]`。
 
-### 3.2 修改 `packer/variables.pkr.hcl`
+### 3.2 填寫 `site.hcl`
 
-依下表逐項檢查，和你的值不同才需要改：
+打開 `overlays/lab/site.hcl`，把等號後面的值換成步驟 2.2 記下的值：
+
+```hcl
+vm_storage  = "vmdata"         # 放 VM 磁碟的 storage
+iso_storage = "local"          # 放 ISO 的 storage
+bridge      = "vmbr1"          # 橋接器
+gateway     = "192.168.11.254" # 閘道
+dns_servers = ["192.168.11.2"] # DNS，這一項是清單
+```
+
+### 3.3 填寫 `template.pkrvars.hcl`
+
+打開 `overlays/lab/template.pkrvars.hcl`，有兩項一定要確認：
 
 | 變數 | 填什麼 |
 |---|---|
-| `vm_storage` | 放 VM 磁碟的 storage |
-| `bridge` | 橋接器 |
 | `iso_file` | 步驟 2.3 查到的光碟完整名稱 |
-| `iso_storage` | 放 ISO 的 storage |
 | `build_ip_cidr` | 建置時暫用的 IP，後面要有 `/24` 這類遮罩長度 |
-| `build_gateway` | 閘道 |
-| `build_dns` | DNS |
 
-以下五項想調整再改：
+`apt_mirror` 是安裝時下載 Ubuntu 套件的來源，範例是台灣的鏡像站，不在台灣時換成離你較近的站。
 
-| 變數 | 範例值 | 說明 |
+其餘是範本的名稱與規格，行首有 `#` 代表使用預設值。想調整時，刪掉那一行開頭的 `#` 再改值：
+
+| 變數 | 預設值 | 說明 |
 |---|---|---|
 | `template_name` | `"ub2604-ci-temp"` | 範本在 PVE 上顯示的名稱 |
 | `cores` | `4` | CPU 核心數 |
 | `memory` | `8192` | 記憶體，單位是 MB |
 | `disk_size` | `"50G"` | 磁碟大小。之後建立的 VM 磁碟不能比它小 |
-| `apt_mirror` | 台灣的鏡像站 | Ubuntu 套件的下載來源，不在台灣時換成離你較近的站 |
-
-表格沒列到的變數不要改，它們由腳本或 `.env` 提供。
-
-### 3.3 修改 `tofu/variables.tf`
-
-| 變數 | 填什麼 |
-|---|---|
-| `vm_storage` | 和 3.2 的 `vm_storage` 相同 |
-| `bridge` | 和 3.2 的 `bridge` 相同 |
-| `gateway` | 所有 VM 共用的閘道 |
-| `dns_servers` | 所有 VM 共用的 DNS，這一項是清單 |
-
-表格沒列到的變數不要改。每台 VM 的名稱、IP 與帳號在第 6 章設定。
-
-<details>
-<summary>範本的 <code>disk_size</code> 改成大於 50G 時</summary>
-
-這個檔案裡還要改一個地方：找到 `variable "vms"` 區塊裡的 `disk_gb = optional(number, 50)`，把 `50` 改成和範本一樣的數字。VM 的磁碟不能小於範本。
-
-</details>
-
-### 3.4 檢查改了什麼
-
-```bash
-git diff packer/variables.pkr.hcl tofu/variables.tf
-```
-
-`-` 開頭的是原本的行，`+` 開頭的是你改後的行。確認每一處都只改到 `default =` 後面的值。
 
 ## 4. 設定 PVE 連線
 
@@ -336,7 +318,7 @@ ssh root@192.168.11.201 'NODE=node5 VM_STORAGE=vmdata ISO_STORAGE=local BRIDGE=v
 {"full-tokenid":"automation@pve!iac","info":{"privsep":"0"},"value":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}
 ```
 
-`value` 後面那串是權杖的密鑰，**只會顯示這一次**。先不要關掉這個終端機視窗，下一步要把它貼進 `.env`。
+`value` 後面那串是權杖的密鑰，**只會顯示這一次**。先不要關掉這個終端機視窗，下一步要把它貼進 `env`。
 
 權杖的權限範圍請看[運作原理的「API 權杖的權限」](how-it-works.md#api-權杖的權限)。
 
@@ -351,16 +333,16 @@ ssh root@192.168.11.201 'pveum user delete automation@pve; pveum role delete Aut
 
 </details>
 
-### 4.2 填寫 `.env`
+### 4.2 填寫 `env`
 
-1. 從範例檔複製一份，並設成只有自己能讀取：
+1. 把範例檔改名成 `env`，並設成只有自己能讀取：
 
    ```bash
-   cp env.example .env
-   chmod 600 .env
+   mv overlays/lab/env.example overlays/lab/env
+   chmod 600 overlays/lab/env
    ```
 
-2. 用編輯器打開 `.env`，修改每一行等號後面的值。等號兩邊不能有空格；`#` 開頭的行是說明，不會生效。
+2. 用編輯器打開 `overlays/lab/env`，修改每一行等號後面的值。等號兩邊不能有空格；`#` 開頭的行是說明，不會生效。
 
    | 變數 | 填什麼 |
    |---|---|
@@ -387,14 +369,14 @@ ssh root@192.168.11.201 'pveum user delete automation@pve; pveum role delete Aut
 3. 存檔後檢查公鑰路徑與權杖：
 
    ```bash
-   set -a; . ./.env; set +a
+   set -a; . overlays/lab/env; set +a
    test -r "${SSH_PUBLIC_KEY_FILE/#\~/$HOME}" && echo "公鑰 OK"
    curl -sk -o /dev/null -w '%{http_code}\n' \
      -H "Authorization: PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_SECRET}" \
      "${PVE_ENDPOINT}/api2/json/nodes/${PVE_NODE}/status"
    ```
 
-   正確的結果是 `公鑰 OK` 與 `200` 兩行。結果不同時，對照下表修正 `.env` 再執行一次：
+   正確的結果是 `公鑰 OK` 與 `200` 兩行。結果不同時，對照下表修正 `env` 再執行一次：
 
    | 結果 | 要檢查的變數 |
    |---|---|
@@ -403,14 +385,22 @@ ssh root@192.168.11.201 'pveum user delete automation@pve; pveum role delete Aut
    | `403` 或其他數字 | `PVE_NODE`；或步驟 4.1 的權限沒有建立成功 |
    | `000` | `PVE_ENDPOINT` |
 
-`.env` 含有權杖，Git 預設會忽略它。
+4. 檢查第 3 章填的兩個檔案格式正確：
+
+   ```bash
+   scripts/build-template.sh lab validate
+   ```
+
+   出現 `The configuration is valid.` 就可以進行下一步。
+
+`env` 含有權杖，Git 預設會忽略它。
 
 ## 5. 建立範本
 
 預設的磁碟配置是根目錄放在 LVM 上、用滿整顆磁碟。想把 `/var` 這類目錄分到獨立的磁碟區，要在建立範本之前改，請先看[修改磁碟配置](disk-layout.md)。
 
 ```bash
-scripts/build-template.sh
+scripts/build-template.sh lab
 ```
 
 第一次執行會下載容器映像檔（約 300 MB），工作機要能連到網際網路。接著 Packer 會自動完成所有步驟，中途不需要操作。正常的輸出依序會出現這幾行：
@@ -447,16 +437,16 @@ template: 1
 
 ## 6. 定義 VM
 
-要建立哪些 VM，寫在兩個檔案裡：
+要建立哪些 VM，寫在 overlay 的兩個檔案裡：
 
 | 檔案 | 內容 |
 |---|---|
-| `tofu/vms.auto.tfvars` | VM 清單：每台的名稱、VMID、IP、帳號與規格 |
-| `tofu/secrets.auto.tfvars` | 每台 VM 帳號的密碼雜湊 |
+| `vms.tfvars` | VM 清單：每台的名稱、VMID、IP、帳號與規格 |
+| `secrets.tfvars` | 每台 VM 帳號的密碼雜湊 |
 
 ### 6.1 填寫 VM 清單
 
-打開 `tofu/vms.auto.tfvars`。裡面的 `ub2604-ci-test1`、`ub2604-ci-test2` 是驗證用的範例，把這兩個區塊刪掉，換成你要的 VM，每台一個區塊。
+打開 `overlays/lab/vms.tfvars`。裡面的 `ub2604-ci-test1`、`ub2604-ci-test2` 是驗證用的範例，把這兩個區塊刪掉，換成你要的 VM，每台一個區塊。
 
 以建立 `web-01`、`db-01` 兩台為例，整個檔案改成這樣：
 
@@ -488,7 +478,7 @@ vms = {
 | `username` | 是 | 登入用的帳號名稱 |
 | `cores` | 否 | CPU 核心數，不寫時是 4 |
 | `memory_mb` | 否 | 記憶體，單位是 MB，不寫時是 8192 |
-| `disk_gb` | 否 | 磁碟大小，單位是 GB，不寫時是 50。不能小於範本的磁碟 |
+| `disk_gb` | 否 | 磁碟大小，單位是 GB，不寫時是 50。不能小於範本的磁碟，所以範本的 `disk_size` 大於 50G 時每台都要寫 |
 
 `vmid` 和 `ip_cidr` 不能和現有的機器重複，也不能和清單裡其他台重複。
 
@@ -504,14 +494,14 @@ vms = {
 
    它印出的那一行就是雜湊，以 `$6$` 開頭、共 106 個字元。清單裡每台 VM 各產生一個；想讓多台用同一組密碼，也可以共用同一個雜湊。
 
-2. 從範例檔複製一份，並設成只有自己能讀取：
+2. 把範例檔改名成 `secrets.tfvars`，並設成只有自己能讀取：
 
    ```bash
-   cp tofu/secrets.auto.tfvars.example tofu/secrets.auto.tfvars
-   chmod 600 tofu/secrets.auto.tfvars
+   mv overlays/lab/secrets.tfvars.example overlays/lab/secrets.tfvars
+   chmod 600 overlays/lab/secrets.tfvars
    ```
 
-3. 打開 `tofu/secrets.auto.tfvars`，把範例的兩個名稱換成你的 VM 名稱，把雜湊完整貼進雙引號中間。清單裡的每一台都要有一行：
+3. 打開 `overlays/lab/secrets.tfvars`，把範例的兩個名稱換成你的 VM 名稱，把雜湊完整貼進雙引號中間。清單裡的每一台都要有一行：
 
    ```hcl
    vm_password_hashes = {
@@ -525,7 +515,7 @@ vms = {
 ### 7.1 初始化
 
 ```bash
-scripts/tofu.sh init
+scripts/tofu.sh lab init
 ```
 
 只有第一次需要執行。看到 `OpenTofu has been successfully initialized!` 代表成功。
@@ -533,7 +523,7 @@ scripts/tofu.sh init
 ### 7.2 預覽
 
 ```bash
-scripts/tofu.sh plan
+scripts/tofu.sh lab plan
 ```
 
 這個指令只會列出打算做的事，不會動到 PVE。看最後一行：
@@ -553,7 +543,7 @@ Plan: 2 to add, 0 to change, 0 to destroy.
 ### 7.3 執行
 
 ```bash
-scripts/tofu.sh apply
+scripts/tofu.sh lab apply
 ```
 
 它會再列一次計畫並詢問是否執行，輸入 `yes` 後按 Enter。在驗證用的環境裡，每台 VM 大約 1 分鐘。完成時會出現這一行，後面接著每台 VM 的 IP、帳號與 VMID：
@@ -589,10 +579,10 @@ Apply complete! Resources: 2 added, 0 changed, 0 destroyed.
 <summary>用驗證腳本做更完整的檢查</summary>
 
 ```bash
-scripts/verify.sh
+scripts/verify.sh lab
 ```
 
-腳本檢查的對象是上一次 `scripts/tofu.sh apply` 建立的 VM，每台 35 項，最後一行是結果：
+腳本檢查的對象是這個 overlay 的 VM，每台 35 項，最後一行是結果：
 
 ```
 Result: 35 passed, 0 failed
@@ -600,7 +590,7 @@ Result: 35 passed, 0 failed
 
 其中一部分是比對硬體設定，執行前要先知道：
 
-- 需要一台手動建立的 VM 或範本當對照組，預設是 VMID 604。用其他 VMID 時執行 `REFERENCE_VMID=100 scripts/verify.sh`。
+- 需要一台手動建立的 VM 或範本當對照組，預設是 VMID 604。用其他 VMID 時執行 `REFERENCE_VMID=100 scripts/verify.sh lab`。
 - 對照組的設定要是 `cpu: host`、`virtio-scsi-single`、`boot: order=scsi0;net0`、`agent: 1`。
 - 沒有符合條件的對照組時，硬體比對的項目會顯示 FAIL。這不代表建置有問題，看其他項目即可。
 
@@ -608,7 +598,7 @@ Result: 35 passed, 0 failed
 
 ## 打開 VM 的 Console
 
-1. 用瀏覽器開啟 `.env` 裡的 `PVE_ENDPOINT`，例如 `https://192.168.11.201:8006`，用 PVE 的帳號登入。
+1. 用瀏覽器開啟 `env` 裡的 `PVE_ENDPOINT`，例如 `https://192.168.11.201:8006`，用 PVE 的帳號登入。
 2. 在左側展開節點，點選要看的 VM（顯示為「VMID（名稱）」）。
 3. 點選右側的「Console」。
 
@@ -621,40 +611,40 @@ Result: 35 passed, 0 failed
 先看 VM 目前的畫面：[打開 VM 的 Console](#打開-vm-的-console)，或擷取成圖片：
 
 ```bash
-scripts/vm-screenshot.sh 605 screen.png
+scripts/vm-screenshot.sh lab 605 screen.png
 ```
 
-依畫面判斷。處理完後，按 Ctrl+C 中止還在等待的 `scripts/build-template.sh`，再重新執行。
+依畫面判斷。處理完後，按 Ctrl+C 中止還在等待的建置指令，再重新執行。
 
 #### 停在開機選單、進入手動安裝畫面，或出現 `Continue with autoinstall?`
 
-Packer 輸入開機指令的時機不對。把 `packer/variables.pkr.hcl` 裡 `boot_wait` 的 `"8s"` 改成 `"15s"`。
+Packer 輸入開機指令的時機不對。在 `overlays/lab/template.pkrvars.hcl` 加一行 `boot_wait = "15s"`，預設是 8 秒。
 
 這個值是 VM 開機後等幾秒才開始輸入。開機選單會停留 30 秒，所以要設在選單出現之後、30 秒之內。
 
 #### 安裝程式顯示錯誤
 
-autoinstall 設定有誤，常見於修改磁碟配置之後。檢查 `packer/files/user-data.pkrtpl.yaml` 的縮排，以及各段的 `id` 是否互相對應。
+autoinstall 設定有誤，常見於修改磁碟配置之後。檢查你的 `user-data.pkrtpl.yaml` 的縮排，以及各段的 `id` 是否互相對應。
 
 #### 已經出現登入提示，Packer 仍在等 SSH
 
-工作機連不到建置用的 IP。在工作機上 `ping` 那個 IP，不通的話檢查 `packer/variables.pkr.hcl` 的 `build_ip_cidr`、`build_gateway` 與 `bridge`。
+工作機連不到建置用的 IP。在工作機上 `ping` 那個 IP，不通的話檢查 `template.pkrvars.hcl` 的 `build_ip_cidr`，以及 `site.hcl` 的 `gateway` 與 `bridge`。
 
 #### 需要更多資訊
 
 ```bash
-PACKER_LOG=1 scripts/build-template.sh
+PACKER_LOG=1 scripts/build-template.sh lab
 ```
 
 建置失敗或被中止時，Packer 會嘗試刪除建到一半的 VM。重新執行前，先執行 `ssh root@192.168.11.201 qm config 605`，出現 `does not exist` 代表它已經不存在。
 
 ### `VMID 605 already exists`
 
-這個 VMID 已經被使用。要重建範本的話，請看[重建範本](operations.md#重建範本)；否則在 `.env` 把 `TEMPLATE_VMID` 改成沒被使用的數字。
+這個 VMID 已經被使用。要重建範本的話，請看[重建範本](operations.md#重建範本)；否則在 `overlays/lab/env` 把 `TEMPLATE_VMID` 改成沒被使用的數字。
 
-### `scripts/tofu.sh apply` 停很久
+### `scripts/tofu.sh lab apply` 停很久
 
 VM 開機失敗，或 cloud-init（VM 第一次開機時套用網路與帳號設定的程式）沒有套用網路設定時，OpenTofu 會一直等到逾時。[打開該 VM 的 Console](#打開-vm-的-console) 查看：
 
 - 畫面停在開機過程或錯誤訊息：範本本身有問題，[重建範本](operations.md#重建範本)。
-- 已經出現登入提示：登入後執行 `ip -br addr`，看 IP 是否和清單裡的 `ip_cidr` 相同。不同的話，檢查 `ip_cidr`、`tofu/variables.tf` 的 `gateway` 與 `bridge`。
+- 已經出現登入提示：登入後執行 `ip -br addr`，看 IP 是否和清單裡的 `ip_cidr` 相同。不同的話，檢查 `vms.tfvars` 的 `ip_cidr`，以及 `site.hcl` 的 `gateway` 與 `bridge`。

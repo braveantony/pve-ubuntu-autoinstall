@@ -1,12 +1,16 @@
-# Secrets and local state: never commit
-.env
-*.auto.pkrvars.hcl
-tofu/terraform.tfvars
-tofu/secrets.auto.tfvars
-tofu/*.tfstate
-tofu/*.tfstate.*
-tofu/.terraform/
-tofu/.terraform.tfstate.lock.info
+# Overlays other than the example stay local by default. To version one of
+# your own, add a line "!/overlays/<name>/" below; the secret and state files
+# listed after it are still ignored.
+/overlays/*
+!/overlays/example/
 
-# Local caches (plugins, downloaded docs, build keys)
+# Secrets and local state: never commit
+overlays/*/env
+overlays/*/secrets.tfvars
+overlays/*/*.tfstate
+overlays/*/*.tfstate.*
+overlays/*/.terraform/
+overlays/*/.terraform.tfstate.lock.info
+
+# Local caches (downloaded docs, build keys)
 .cache/

@@ -1,6 +1,4 @@
 .git
 .cache
-.env
-tofu/.terraform
-tofu/*.tfstate*
-tofu/secrets.auto.tfvars
+overlays
+website

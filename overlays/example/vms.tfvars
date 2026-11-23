@@ -1,6 +1,6 @@
 # The VMs OpenTofu manages. Add a block to get another VM, then run
-# scripts/tofu.sh apply. Each name also needs a password hash in
-# secrets.auto.tfvars (generate it with scripts/hash-password.sh).
+# scripts/tofu.sh <overlay> apply. Each name also needs a password hash in
+# secrets.tfvars (generate it with scripts/hash-password.sh).
 vms = {
   # Same size as the template.
   ub2604-ci-test1 = {

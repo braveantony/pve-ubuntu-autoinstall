@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Turn a login password into the SHA-512 crypt hash that goes into
-# tofu/secrets.auto.tfvars. The password is read without echo, is never
+# the overlay's secrets.tfvars. The password is read without echo, is never
 # written to disk and never appears in a command line or shell history.
 #
 #   scripts/hash-password.sh

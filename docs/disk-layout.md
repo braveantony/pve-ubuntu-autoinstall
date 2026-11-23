@@ -2,7 +2,13 @@
 
 預設的配置是根目錄放在 LVM 上、用滿整顆磁碟。這份文件說明怎麼把 `/var` 這類目錄分到獨立的磁碟區。修改要在建立範本之前進行；範本已經建好的話，改完後要[重建範本](operations.md#重建範本)。
 
-磁碟配置寫在 `packer/files/user-data.pkrtpl.yaml` 的 `storage` 區塊。這裡用到 LVM 的三個名詞：
+磁碟配置寫在 autoinstall 設定檔的 `storage` 區塊。共用的版本是 `base/packer/files/user-data.pkrtpl.yaml`；overlay 裡有同名的檔案時，建置會改用 overlay 的那一份。所以修改時不動 `base/`，而是複製一份到自己的 overlay 再改：
+
+```bash
+cp base/packer/files/user-data.pkrtpl.yaml overlays/lab/
+```
+
+這裡用到 LVM 的三個名詞：
 
 - PV（physical volume）：交給 LVM 管理的分割區。
 - VG（volume group）：由 PV 組成的儲存空間集合。
@@ -20,7 +26,7 @@
 
 以 `/var` 分出 15G 為例。新的 LV 給固定大小，根目錄的 `ubuntu-lv` 維持 `size: -1`，也就是用掉剩下的全部空間。
 
-打開 `packer/files/user-data.pkrtpl.yaml`，在 `storage:` 底下的 `config:` 清單裡，加入標示「新增」的三段。清單的後半段改完後是這樣，註解只是用來指出位置，不用照抄：
+打開 `overlays/lab/user-data.pkrtpl.yaml`，在 `storage:` 底下的 `config:` 清單裡，加入標示「新增」的三段。清單的後半段改完後是這樣，註解只是用來指出位置，不用照抄：
 
 ```yaml
       - id: vg0
@@ -80,8 +86,8 @@ sda                         50G disk
 ├─sda1                       1M part
 ├─sda2                       2G part /boot
 └─sda3                      48G part
-  ├─ubuntu--vg-var--lv      15G lvm  /var
-  └─ubuntu--vg-ubuntu--lv   33G lvm  /
+  ├─ubuntu--vg-ubuntu--lv   33G lvm  /
+  └─ubuntu--vg-var--lv      15G lvm  /var
 ```
 
 ## 限制
@@ -91,4 +97,4 @@ sda                         50G disk
 - VG 不能留下未配置的空間。建置時會檢查這一點，有剩餘空間就會失敗，所以根目錄的 LV 要維持 `size: -1`。
 - VG 與根目錄 LV 的名稱要維持 `ubuntu-vg` 與 `ubuntu-lv`，`/boot` 要維持獨立的分割區。建置時的檢查寫死了這些名稱。
 - 加大磁碟後，新增的空間全部加給根目錄的 LV，其他 LV 不會跟著變大。
-- `scripts/verify.sh` 會回報根目錄大小不符。它預期根目錄接近整顆磁碟的大小，分出其他 LV 之後這一項會顯示 FAIL，可以忽略。
+- `scripts/verify.sh` 會回報根目錄大小不符。它預期根目錄接近整顆磁碟的大小，分出其他 LV 之後，根目錄 LV 與根目錄檔案系統這兩項會顯示 FAIL，可以忽略。

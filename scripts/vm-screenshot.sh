@@ -3,18 +3,19 @@
 # Useful when the installer hangs and you want to see why without opening
 # the PVE web console.
 #
-#   scripts/vm-screenshot.sh <vmid> <out.png>
+#   scripts/vm-screenshot.sh <overlay> <vmid> <out.png>
 #
-# Needs SSH to the PVE node (PVE_SSH in .env, root or a user with passwordless
+# Needs SSH to the PVE node (PVE_SSH in the overlay env, root or a user with passwordless
 # sudo) and python3 locally (standard library only).
 set -euo pipefail
 
-vmid="${1:?usage: $0 <vmid> <out.png>}"
-out="${2:?usage: $0 <vmid> <out.png>}"
-repo=$(cd "$(dirname "$0")/.." && pwd)
-[ -f "$repo/.env" ] && { set -a; . "$repo/.env"; set +a; }
-node_ssh="${PVE_SSH:?set PVE_SSH in .env, for example root@192.168.11.201}"
-node="${PVE_NODE:?set PVE_NODE in .env}"
+usage="usage: $0 <overlay> <vmid> <out.png>"
+. "$(dirname "$0")/lib.sh"
+load_overlay "${1:-}"
+vmid="${2:?$usage}"
+out="${3:?$usage}"
+node_ssh="${PVE_SSH:?set PVE_SSH in overlays/$overlay/env, for example root@192.168.11.201}"
+node="${PVE_NODE:?set PVE_NODE in overlays/$overlay/env}"
 remote="/tmp/vm-${vmid}-screen.$$.ppm"
 
 ssh -o BatchMode=yes "$node_ssh" \

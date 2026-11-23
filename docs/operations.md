@@ -2,7 +2,9 @@
 
 範本與 VM 建好之後的操作。第一次建置請看[建置手冊](getting-started.md)。
 
-VM 的新增、調整與刪除都是同一個流程：修改 `tofu/vms.auto.tfvars`，執行 `scripts/tofu.sh plan` 看它打算做什麼，確認無誤後執行 `scripts/tofu.sh apply`。
+指令裡的 `lab` 是 overlay 的名稱，檔案路徑也都以 `overlays/lab/` 為例，請換成你自己的。
+
+VM 的新增、調整與刪除都是同一個流程：修改 `overlays/lab/vms.tfvars`，執行 `scripts/tofu.sh lab plan` 看它打算做什麼，確認無誤後執行 `scripts/tofu.sh lab apply`。
 
 `plan` 最後一行的數字和你預期的不同時，**先不要執行 `apply`**。尤其是出現你沒打算刪除的 `to destroy`，或某台 VM 標示為 `must be replaced`（先刪除再重建，資料會消失）。
 
@@ -10,9 +12,9 @@ VM 的新增、調整與刪除都是同一個流程：修改 `tofu/vms.auto.tfva
 
 `plan` 應該顯示 `1 to add, 0 to change, 0 to destroy`。
 
-1. 在 `tofu/vms.auto.tfvars` 的 `vms = { ... }` 裡加一個區塊，寫法和[建置手冊的步驟 6.1](getting-started.md#61-填寫-vm-清單) 相同。
-2. 執行 `scripts/hash-password.sh` 產生雜湊，在 `tofu/secrets.auto.tfvars` 加一行同名的項目。
-3. 執行 `scripts/tofu.sh plan`，確認後執行 `scripts/tofu.sh apply`。
+1. 在 `vms.tfvars` 的 `vms = { ... }` 裡加一個區塊，寫法和[建置手冊的步驟 6.1](getting-started.md#61-填寫-vm-清單) 相同。
+2. 執行 `scripts/hash-password.sh` 產生雜湊，在 `secrets.tfvars` 加一行同名的項目。
+3. 執行 `scripts/tofu.sh lab plan`，確認後執行 `scripts/tofu.sh lab apply`。
 
 ## 調整 CPU 或記憶體
 
@@ -35,7 +37,7 @@ VM 的新增、調整與刪除都是同一個流程：修改 `tofu/vms.auto.tfva
      }
    ```
 
-2. 執行 `scripts/tofu.sh plan`，確認後執行 `scripts/tofu.sh apply`。在驗證用的環境裡，磁碟會立刻變大，VM 不會重開機，但這時 VM 裡的根目錄還是原本的大小。
+2. 執行 `scripts/tofu.sh lab plan`，確認後執行 `scripts/tofu.sh lab apply`。在驗證用的環境裡，磁碟會立刻變大，VM 不會重開機，但這時 VM 裡的根目錄還是原本的大小。
 
 3. 登入 VM，讓根目錄擴充到新的大小。把 VM 重開機也有同樣的效果：
 
@@ -50,9 +52,9 @@ VM 的新增、調整與刪除都是同一個流程：修改 `tofu/vms.auto.tfva
 
 刪除一台時，`plan` 應該顯示 `0 to add, 0 to change, 1 to destroy`。
 
-從 `tofu/vms.auto.tfvars` 刪掉那台 VM 的整個區塊，並刪掉 `tofu/secrets.auto.tfvars` 裡它的那一行，再執行 `plan` 與 `apply`。
+從 `vms.tfvars` 刪掉那台 VM 的整個區塊，並刪掉 `secrets.tfvars` 裡它的那一行，再執行 `plan` 與 `apply`。
 
-要刪除 OpenTofu 管理的全部 VM，執行 `scripts/tofu.sh destroy`，核對它列出的 VM 後再輸入 `yes`。
+要刪除 OpenTofu 管理的全部 VM，執行 `scripts/tofu.sh lab destroy`，核對它列出的 VM 後再輸入 `yes`。
 
 ## 重建範本
 
@@ -72,18 +74,32 @@ VM 的新增、調整與刪除都是同一個流程：修改 `tofu/vms.auto.tfva
    ssh root@192.168.11.201 qm destroy 605
    ```
 
-3. 執行 `scripts/build-template.sh`。
+3. 執行 `scripts/build-template.sh lab`。
+
+## 新增另一個環境
+
+每個 overlay 是一個獨立的環境，有自己的 PVE 連線、範本、VM 清單與狀態檔，互不影響。要管理另一座 PVE，或在同一座 PVE 上建立另一種規格的範本，就再建立一個 overlay：
+
+```bash
+cp -r overlays/example overlays/prod
+```
+
+接著照[建置手冊](getting-started.md)的第 3 章到第 7 章填寫 `overlays/prod` 並執行，指令裡的 `lab` 換成 `prod`。
+
+兩個 overlay 指向同一座 PVE 時，可以共用同一組 API 權杖，但 `TEMPLATE_VMID`、範本名稱、建置用的 IP，以及每台 VM 的 VMID 與 IP 都不能重複。
 
 ## 不會進 git 的檔案
 
-以下檔案含有機密或本機狀態，Git 預設會忽略它們：
+每個 overlay 裡的以下檔案含有機密或本機狀態，Git 一律忽略它們：
 
 | 檔案 | 內容 |
 |---|---|
-| `.env` | PVE 位址與 API 權杖 |
-| `tofu/secrets.auto.tfvars` | 每台 VM 的密碼雜湊 |
-| `tofu/terraform.tfstate` | OpenTofu 的狀態檔，記錄它管理的每台 VM，裡面也有密碼雜湊 |
-| `.cache/` | Packer 的暫存檔 |
+| `env` | PVE 位址與 API 權杖 |
+| `secrets.tfvars` | 每台 VM 的密碼雜湊 |
+| `terraform.tfstate` | OpenTofu 的狀態檔，記錄它管理的每台 VM，裡面也有密碼雜湊 |
+| `.terraform/` | OpenTofu 的工作目錄 |
+
+另外，`overlays/` 底下除了 `example` 以外的目錄，預設整個不進 Git。想把自己的 overlay 納入版本控制，在 `.gitignore` 加一行 `!/overlays/lab/`；上表的四項仍然會被忽略。
 
 狀態檔只存在工作機上，沒有遠端備份。遺失後，OpenTofu 就不知道哪些 VM 歸它管理，請自行備份。
 
@@ -95,7 +111,7 @@ VM 的新增、調整與刪除都是同一個流程：修改 `tofu/vms.auto.tfva
 podman build -t localhost/pve-ubuntu-autoinstall:dev .
 ```
 
-再把 `.env` 裡 `TOOLS_IMAGE` 那一行開頭的 `#` 刪掉，值改成 `localhost/pve-ubuntu-autoinstall:dev`。
+再把 `overlays/lab/env` 裡 `TOOLS_IMAGE` 那一行開頭的 `#` 刪掉，值改成 `localhost/pve-ubuntu-autoinstall:dev`。
 
 ## 全部移除
 
@@ -104,7 +120,7 @@ podman build -t localhost/pve-ubuntu-autoinstall:dev .
 1. 刪除 OpenTofu 管理的 VM。它會先列出要刪除的對象，核對後再輸入 `yes`：
 
    ```bash
-   scripts/tofu.sh destroy
+   scripts/tofu.sh lab destroy
    ```
 
    狀態檔遺失時，這個指令找不到要刪除的 VM，要到 PVE 上逐台確認後手動刪除。

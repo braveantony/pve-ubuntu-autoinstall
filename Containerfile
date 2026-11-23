@@ -1,6 +1,6 @@
 # One image with everything the scripts run: Packer (with xorriso), OpenTofu,
 # the Packer Proxmox plugin and the OpenTofu Proxmox provider. The plugin and
-# provider versions come from packer/*.pkr.hcl and tofu/versions.tf, so those
+# provider versions come from base/packer/*.pkr.hcl and base/tofu/versions.tf, so those
 # files stay the single place where versions are pinned.
 #
 #   podman build -t ghcr.io/braveantony/pve-ubuntu-autoinstall:dev .
@@ -19,12 +19,12 @@ ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
     CHECKPOINT_DISABLE=1
 
 # Packer plugin: install the version required by the template.
-COPY packer/ubuntu-2604.pkr.hcl /tmp/pin/packer/
+COPY base/packer/ubuntu-2604.pkr.hcl /tmp/pin/packer/
 RUN packer init /tmp/pin/packer/ubuntu-2604.pkr.hcl
 
 # OpenTofu provider: mirror the locked version into the image and make tofu
 # install from that mirror only, so "tofu init" needs no network access.
-COPY tofu/versions.tf tofu/.terraform.lock.hcl /tmp/pin/tofu/
+COPY base/tofu/versions.tf base/tofu/.terraform.lock.hcl /tmp/pin/tofu/
 RUN cd /tmp/pin/tofu \
  && tofu providers mirror /opt/tofu/providers \
  && printf 'provider_installation {\n  filesystem_mirror {\n    path = "/opt/tofu/providers"\n  }\n}\n' > /opt/tofu/tofu.rc \

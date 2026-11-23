@@ -3,16 +3,16 @@
 # repo: per-VM network and account from cloud-init, root on LVM grown to the
 # disk size, and a console/kernel setup identical to a manual ISO install.
 #
-#   scripts/verify.sh
+#   scripts/verify.sh <overlay>
 #
-# Needs: the VMs applied (scripts/tofu.sh apply), SSH key login to them from
-# this machine, and SSH to the PVE node (PVE_SSH in .env, root or a user with
+# Needs: the VMs applied (scripts/tofu.sh <overlay> apply), SSH key login to them from
+# this machine, and SSH to the PVE node (PVE_SSH in the overlay env, root or a user with
 # passwordless sudo) for the hardware comparison.
 set -uo pipefail
 
-repo=$(cd "$(dirname "$0")/.." && pwd)
-[ -f "$repo/.env" ] && { set -a; . "$repo/.env"; set +a; }
-node_ssh="${PVE_SSH:?set PVE_SSH in .env, for example root@192.168.11.201}"
+. "$(dirname "$0")/lib.sh"
+load_overlay "${1:-}" || exit 1
+node_ssh="${PVE_SSH:?set PVE_SSH in overlays/$overlay/env, for example root@192.168.11.201}"
 reference_vmid="${REFERENCE_VMID:-604}" # hand-built template to compare hardware with
 build_username="${BUILD_USERNAME:-packer}"
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no
@@ -25,7 +25,7 @@ check() { # check <description> <actual> <expected>
   if [ "$2" = "$3" ]; then ok "$1: $2"; else bad "$1: got '$2', expected '$3'"; fi
 }
 
-vms_json=$("$repo/scripts/tofu.sh" output -json vms) || { echo "cannot read tofu output" >&2; exit 1; }
+vms_json=$("$repo/scripts/tofu.sh" "$overlay" output -json vms) || { echo "cannot read tofu output" >&2; exit 1; }
 
 # Hardware keys a hand-built VM has; values that are per-VM by nature are
 # not compared (name, sizes, MAC, UUIDs).
@@ -122,5 +122,5 @@ echo
 echo "Result: $pass passed, $fail failed"
 echo "Still to check by hand in the PVE web console (noVNC) of each VM:"
 echo "  - the login prompt is shown on the graphical console (tty1)"
-echo "  - logging in there with the password you hashed for secrets.auto.tfvars works"
+echo "  - logging in there with the password you hashed for secrets.tfvars works"
 [ "$fail" -eq 0 ]

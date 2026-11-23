@@ -1,7 +1,7 @@
 #cloud-config
 # Subiquity autoinstall answers for the Ubuntu Server 26.04 template.
-# Rendered by Packer (templatefile); values in dollar-brace come from
-# packer/variables.pkr.hcl.
+# Rendered by Packer (templatefile); values in dollar-brace come from the
+# overlay (site.hcl and template.pkrvars.hcl).
 autoinstall:
   version: 1
 
@@ -35,14 +35,16 @@ autoinstall:
           - ${build_ip_cidr}
         routes:
           - to: default
-            via: ${build_gateway}
+            via: ${gateway}
         nameservers:
           addresses:
-            - ${build_dns}
+%{ for server in dns_servers ~}
+            - ${server}
+%{ endfor ~}
 
   # Disk layout. To split /var, /home and so on into their own logical
-  # volumes, add more lvm_partition + format + mount triples and give
-  # ubuntu-lv a fixed size. If you do, also revisit files/grow-root-lvm, which
+  # volumes, add more lvm_partition + format + mount triples before lv-root and
+  # keep ubuntu-lv at size -1 (see docs/disk-layout.md). files/grow-root-lvm
   # hands ALL new space to the root LV.
   storage:
     swap:

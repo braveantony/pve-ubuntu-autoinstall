@@ -13,12 +13,12 @@
 
 ## To start using
 
-你需要一台運作中的 PVE，以及一台裝有 podman、能連到 PVE 的 Linux 工作機。設定填好之後，流程是三個指令：
+你需要一台運作中的 PVE，以及一台裝有 podman、能連到 PVE 的 Linux 工作機。每個環境的設定值放在自己的 overlay 目錄（`overlays/<名稱>`）裡，範本與 VM 的定義（`base/`）所有環境共用。填好名為 `lab` 的 overlay 之後，流程是三個指令：
 
 ```bash
-scripts/build-template.sh   # 建立範本
-scripts/tofu.sh init        # 初始化 OpenTofu，只有第一次需要
-scripts/tofu.sh apply       # 從範本建立 VM
+scripts/build-template.sh lab   # 建立範本
+scripts/tofu.sh lab init        # 初始化 OpenTofu，只有第一次需要
+scripts/tofu.sh lab apply       # 從範本建立 VM
 ```
 
 在驗證用的環境裡，建立範本約 8 分鐘，建立一台 VM 約 1 分鐘。

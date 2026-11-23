@@ -11,13 +11,15 @@ packer {
 locals {
   # Autoinstall answers for subiquity, shipped to the installer on a small
   # NoCloud seed CD (volume label "cidata") that Packer builds and uploads.
-  user_data = templatefile("${path.root}/files/user-data.pkrtpl.yaml", {
+  # An overlay can replace the whole file (for example to change the disk
+  # layout) by providing its own user-data.pkrtpl.yaml.
+  user_data = templatefile(var.user_data_template != "" ? var.user_data_template : "${path.root}/files/user-data.pkrtpl.yaml", {
     hostname            = var.template_name
     build_username      = var.build_username
     build_password_hash = var.build_password_hash
     build_ip_cidr       = var.build_ip_cidr
-    build_gateway       = var.build_gateway
-    build_dns           = var.build_dns
+    gateway             = var.gateway
+    dns_servers         = var.dns_servers
     apt_mirror          = var.apt_mirror
   })
 

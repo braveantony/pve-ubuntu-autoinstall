@@ -1,6 +1,10 @@
 terraform {
   required_version = ">= 1.13.0"
 
+  # The state lives in the overlay: scripts/tofu.sh passes its path to
+  # "tofu init" as -backend-config.
+  backend "local" {}
+
   required_providers {
     proxmox = {
       source  = "bpg/proxmox"

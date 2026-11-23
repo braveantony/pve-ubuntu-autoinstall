@@ -26,7 +26,7 @@ Packer 與 OpenTofu 都在工作機上以容器執行。兩者透過 PVE API 管
 | 是什麼 | Ubuntu 安裝程式的自動安裝模式，依一份 YAML 回答所有安裝問題，過程不需要人操作 | 已安裝的系統在第一次開機時，讀取外部設定並套用的程式 |
 | 在這個專案裡的用途 | 階段一，安裝當下 | 階段二，每台 VM 第一次開機時 |
 | 決定什麼 | 磁碟分割與 LVM 配置、核心、套件、語系與時區 | IP、閘道、DNS、主機名稱、帳號、密碼雜湊、SSH 公鑰 |
-| 設定寫在哪裡 | `packer/files/user-data.pkrtpl.yaml` | 每台各自的值在 `tofu/vms.auto.tfvars` 與 `tofu/secrets.auto.tfvars`；共用的閘道與 DNS 在 `tofu/variables.tf`；SSH 公鑰來自工作機 |
+| 設定寫在哪裡 | `base/packer/files/user-data.pkrtpl.yaml` | 每台各自的值在 overlay 的 `vms.tfvars` 與 `secrets.tfvars`；共用的閘道與 DNS 在 overlay 的 `site.hcl`；SSH 公鑰來自工作機 |
 
 這個專案在安裝當下就用 autoinstall 建立指定的 LVM 配置，因為系統裝好之後根目錄已經在使用中，要改分割方式很麻煩。這也是不直接用 Ubuntu 的 cloud image（雲端平台用的預製磁碟映像檔）的原因：它的磁碟配置在映像檔製作時就定好了，cloud-init 只能設定系統，不能重新分割根目錄所在的磁碟。
 
@@ -34,7 +34,7 @@ Packer 與 OpenTofu 都在工作機上以容器執行。兩者透過 PVE API 管
 
 ![建立範本](architecture/stage1-build-template.svg)
 
-由 `scripts/build-template.sh` 啟動。它每次執行都會產生一組隨機密碼給臨時帳號 `packer` 使用，再用容器執行 Packer。範本的 VMID 取自 `.env` 的 `TEMPLATE_VMID`，以下以預設的 605 說明。
+由 `scripts/build-template.sh <overlay>` 啟動。它每次執行都會產生一組隨機密碼給臨時帳號 `packer` 使用，再用容器執行 Packer。範本的 VMID 取自 overlay 的 `env` 裡的 `TEMPLATE_VMID`，以下以預設的 605 說明。
 
 **① 上傳種子光碟**
 
@@ -42,7 +42,7 @@ Packer 把 autoinstall 設定做成一張小光碟，上傳到 PVE 的 ISO stora
 
 **② 建立 VM 605**
 
-VM 的硬體規格定義在 `packer/ubuntu-2604.pkr.hcl`：SeaBIOS、`cpu: host`、`virtio-scsi-single` 控制器、virtio 網卡。沒有指定顯示卡，也沒有序列埠，所以使用 PVE 預設的 VGA。磁碟接在 `scsi0`，安裝光碟接在 `ide2`，種子光碟接在 `ide3`。
+VM 的硬體規格定義在 `base/packer/ubuntu-2604.pkr.hcl`：SeaBIOS、`cpu: host`、`virtio-scsi-single` 控制器、virtio 網卡。沒有指定顯示卡，也沒有序列埠，所以使用 PVE 預設的 VGA。磁碟接在 `scsi0`，安裝光碟接在 `ide2`，種子光碟接在 `ide3`。
 
 開機順序是磁碟優先。這時磁碟是空的，所以 BIOS 會改從安裝光碟開機。
 
@@ -82,7 +82,7 @@ Packer 從步驟 ③ 之後就一直嘗試用 SSH 連線。安裝期間連到的
 
 **⑥ 檢查並安裝磁碟擴充服務**
 
-Packer 上傳並執行 `packer/scripts/provision.sh`。它先確認安裝結果符合預期，任何一項不符就讓建置失敗：
+Packer 上傳並執行 `base/packer/scripts/provision.sh`。它先確認安裝結果符合預期，任何一項不符就讓建置失敗：
 
 - 根目錄在 `ubuntu-vg/ubuntu-lv` 上，`/boot` 是獨立的檔案系統，VG 沒有剩餘空間。
 - 已安裝 `linux-generic`。
@@ -94,7 +94,7 @@ Packer 上傳並執行 `packer/scripts/provision.sh`。它先確認安裝結果�
 
 **⑦ 清理**
 
-Packer 執行 `packer/scripts/seal.sh`，移除不該被每台 VM 共用的東西：
+Packer 執行 `base/packer/scripts/seal.sh`，移除不該被每台 VM 共用的東西：
 
 - **重新啟用 cloud-init**：用安裝光碟裝出來的系統，cloud-init 在第一次開機後會被停用，資料來源（datasource）也被設成 `None`。腳本執行 `cloud-init clean --logs --machine-id --seed`，這個指令會連帶執行安裝程式留下的清理掛鉤 `/etc/cloud/clean.d/99-installer`，刪除造成停用的設定檔，以及安裝時寫入的網路設定 `/etc/netplan/00-installer-config.yaml`。
 - **移除機器識別資料**：machine-id 與 SSH 主機金鑰。每台 VM 第一次開機時會各自重新產生。
@@ -108,7 +108,7 @@ Packer 透過 PVE API 把 VM 關機、卸除兩張光碟並移除光碟機、轉
 
 ![複製 VM](architecture/stage2-clone-vm.svg)
 
-由 `scripts/tofu.sh apply` 啟動。OpenTofu 比對 `tofu/vms.auto.tfvars` 裡的清單與狀態檔，找出需要建立、修改或刪除的 VM。以下是建立一台 VM 的過程。
+由 `scripts/tofu.sh <overlay> apply` 啟動。OpenTofu 比對 overlay 的 `vms.tfvars` 裡的清單與狀態檔，找出需要建立、修改或刪除的 VM。以下是建立一台 VM 的過程。
 
 **① 複製範本**
 
@@ -192,9 +192,9 @@ VM 裡的 `qemu-guest-agent` 把網路介面與 IP 回報給 PVE。在驗證用�
 
 以下內容**還沒有實作**，目前建立 `disk-growth.yaml` 不會有任何效果。這一節只是把已經討論過的設計記錄下來。
 
-**現況**：磁碟與 LVM 的配置可以在 `packer/files/user-data.pkrtpl.yaml` 裡調整，但 `grow-root-lvm` 的規則是寫死的，VG 裡空閒的空間固定全部加給根目錄的 LV。範本改成多個 LV 之後，其他 LV 不會跟著磁碟變大。
+**現況**：磁碟與 LVM 的配置可以在 `user-data.pkrtpl.yaml` 裡調整，但 `grow-root-lvm` 的規則是寫死的，VG 裡空閒的空間固定全部加給根目錄的 LV。範本改成多個 LV 之後，其他 LV 不會跟著磁碟變大。
 
-**已定案的設定格式**：新增 `packer/files/disk-growth.yaml`，列出新空間依什麼比例分給哪些 LV。
+**已定案的設定格式**：新增 `base/packer/files/disk-growth.yaml`，列出新空間依什麼比例分給哪些 LV。
 
 ```yaml
 # share 是百分比，總和不可超過 100；不足 100 的部分留在 VG 裡不配置。
@@ -224,6 +224,6 @@ grow:
 | 選項 | 做法 | 代價 |
 |---|---|---|
 | 綁在範本上 | 建置範本時把 `disk-growth.yaml` 複製到 VM 的 `/etc/disk-growth.yaml`，同一個範本複製出來的 VM 共用一份規則。個別 VM 要不同規則時，登入後修改這個檔案再重開機 | 無法在 OpenTofu 的 VM 清單裡為個別 VM 指定規則 |
-| 每台 VM 在清單裡指定 | 在 `tofu/vms.auto.tfvars` 為每台 VM 寫規則，複製時傳進 VM | PVE 內建的 cloud-init 欄位傳不了這種設定，要改用自訂的 cloud-init 設定檔：ISO storage 要啟用 snippets、OpenTofu 要能 SSH 到 PVE 節點，而且 PVE 網頁上的 cloud-init 欄位會失效 |
+| 每台 VM 在清單裡指定 | 在 overlay 的 `vms.tfvars` 為每台 VM 寫規則，複製時傳進 VM | PVE 內建的 cloud-init 欄位傳不了這種設定，要改用自訂的 cloud-init 設定檔：ISO storage 要啟用 snippets、OpenTofu 要能 SSH 到 PVE 節點，而且 PVE 網頁上的 cloud-init 欄位會失效 |
 
 規則必須和 LV 的配置對得上，而 LV 的配置是在建置範本時決定的，所以目前傾向第一個選項。
