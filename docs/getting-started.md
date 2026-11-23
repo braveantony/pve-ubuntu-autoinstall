@@ -29,7 +29,7 @@
 
 你需要兩台機器：
 
-- PVE 節點：一台運作中的 Proxmox VE 主機，VM 就執行在它上面。這份手冊在 PVE 9.2 上驗證過。
+- PVE 節點：一台運作中的 Proxmox VE 主機，VM 就執行在它上面。手冊裡的指令與輸出範例以 PVE 9.2 為準，其他版本的畫面與輸出可能略有不同。
 - 工作機：一台 Linux，用來執行這個 repo 的腳本。它要和 PVE 節點、VM 所在的網段互通。
 
 手冊裡所有的指令都在工作機上執行。需要在 PVE 節點上執行的指令，都寫成 `ssh root@192.168.11.201 <指令>` 的形式，從工作機送過去。
@@ -233,7 +233,7 @@ https://releases.ubuntu.com/26.04/ubuntu-26.04-live-server-amd64.iso
 dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9
 ```
 
-這個專案只用 26.04 這張光碟驗證過，之後的小改版（例如 26.04.1）沒有測過。
+請使用 26.04 這張光碟。改用其他版本（例如之後的 26.04.1）時，要把 `template.pkrvars.hcl` 的 `iso_file` 改成新的檔名。開機指令裡的核心路徑與等待秒數是對應這張光碟寫的，換光碟後建置如果卡住，請看[除錯](#除錯)。
 
 ## 3. 建立你的 overlay
 
@@ -417,7 +417,7 @@ scripts/build-template.sh lab
 ==> proxmox-iso.ubuntu: Converting VM to template
 ```
 
-`Waiting for SSH` 這一行會停留好幾分鐘，安裝程式正在 VM 裡安裝系統。在驗證用的環境裡，整個建置大約 8 分鐘。
+`Waiting for SSH` 這一行會停留好幾分鐘，安裝程式正在 VM 裡安裝系統。整個建置大約 8 分鐘，實際時間依磁碟速度與套件下載速度而定。
 
 沒有出現 `Converting VM to template`，或指令以錯誤結束時，請看[除錯](#除錯)。
 
@@ -446,7 +446,7 @@ template: 1
 
 ### 6.1 填寫 VM 清單
 
-打開 `overlays/lab/vms.tfvars`。裡面的 `ub2604-ci-test1`、`ub2604-ci-test2` 是驗證用的範例，把這兩個區塊刪掉，換成你要的 VM，每台一個區塊。
+打開 `overlays/lab/vms.tfvars`。裡面的 `ub2604-ci-test1`、`ub2604-ci-test2` 是範例，把這兩個區塊刪掉，換成你要的 VM，每台一個區塊。
 
 以建立 `web-01`、`db-01` 兩台為例，整個檔案改成這樣：
 
@@ -546,7 +546,7 @@ Plan: 2 to add, 0 to change, 0 to destroy.
 scripts/tofu.sh lab apply
 ```
 
-它會再列一次計畫並詢問是否執行，輸入 `yes` 後按 Enter。在驗證用的環境裡，每台 VM 大約 1 分鐘。完成時會出現這一行，後面接著每台 VM 的 IP、帳號與 VMID：
+它會再列一次計畫並詢問是否執行，輸入 `yes` 後按 Enter。每台 VM 大約 1 分鐘，實際時間依磁碟速度而定。完成時會出現這一行，後面接著每台 VM 的 IP、帳號與 VMID：
 
 ```
 Apply complete! Resources: 2 added, 0 changed, 0 destroyed.

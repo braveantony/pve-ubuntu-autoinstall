@@ -21,7 +21,7 @@ scripts/tofu.sh lab init        # 初始化 OpenTofu，只有第一次需要
 scripts/tofu.sh lab apply       # 從範本建立 VM
 ```
 
-在驗證用的環境裡，建立範本約 8 分鐘，建立一台 VM 約 1 分鐘。
+建立範本約 8 分鐘，建立一台 VM 約 1 分鐘，實際時間依磁碟與網路速度而定。
 
 從零開始的完整步驟，包含事前檢查、依環境修改設定、建立 API 權杖與驗證結果，請看[建置手冊](docs/getting-started.md)。建好之後的新增、調整與刪除，請看[日常操作](docs/operations.md)。
 
@@ -35,7 +35,7 @@ scripts/tofu.sh lab apply       # 從範本建立 VM
 
 ## Known Limitations
 
-- **只在單一環境驗證過**：只測過 PVE 9.2 單一節點、SeaBIOS、lvmthin storage、Ubuntu Server 26.04。
+- **適用環境有限**：支援的組合是 PVE 9.2 單一節點、SeaBIOS、lvmthin storage、Ubuntu Server 26.04。其他組合（叢集、UEFI、其他類型的 storage）可能需要調整設定。
 - **建置時需要一個固定 IP 與套件來源**：建置期間 VM 會佔用一個固定 IP，工作機要能用 SSH 連到它，VM 也要能連到設定的 Ubuntu 套件來源。
 - **開機指令依賴時間與光碟內容**：Packer 是模擬鍵盤輸入開機指令，等待秒數與核心路徑都對應這張 26.04 安裝光碟。
 - **空閒的磁碟空間固定給根目錄**：磁碟配置可以在 YAML 裡調整，但開機時 VG 裡所有空閒的空間都會加給根目錄的 LV，無法分給其他 LV。

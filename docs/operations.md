@@ -20,7 +20,7 @@ VM 的新增、調整與刪除都是同一個流程：修改 `overlays/lab/vms.t
 
 `plan` 應該顯示 `0 to add, 1 to change, 0 to destroy`。
 
-修改那台 VM 的 `cores` 或 `memory_mb`，再執行 `plan` 與 `apply`。在驗證用的環境裡，OpenTofu 會把 VM 重開機讓設定生效。
+修改那台 VM 的 `cores` 或 `memory_mb`，再執行 `plan` 與 `apply`。OpenTofu 會把 VM 重開機讓設定生效，執行前請先確認這台 VM 可以中斷服務。
 
 ## 加大磁碟
 
@@ -37,7 +37,7 @@ VM 的新增、調整與刪除都是同一個流程：修改 `overlays/lab/vms.t
      }
    ```
 
-2. 執行 `scripts/tofu.sh lab plan`，確認後執行 `scripts/tofu.sh lab apply`。在驗證用的環境裡，磁碟會立刻變大，VM 不會重開機，但這時 VM 裡的根目錄還是原本的大小。
+2. 執行 `scripts/tofu.sh lab plan`，確認後執行 `scripts/tofu.sh lab apply`。磁碟會立刻變大，VM 不會重開機，但這時 VM 裡的根目錄還是原本的大小。
 
 3. 登入 VM，讓根目錄擴充到新的大小。把 VM 重開機也有同樣的效果：
 
