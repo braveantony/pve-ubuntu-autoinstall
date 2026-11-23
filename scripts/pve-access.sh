@@ -6,7 +6,9 @@
 # The token secret is shown only once: capture stdout.
 #
 # To undo everything this script did:
-#   pveum user delete automation@pve     # also removes its token and ACLs
+#   pveum user token remove automation@pve iac   # first: deleting only the user
+#                                                # leaves the secret in token.cfg
+#   pveum user delete automation@pve             # also removes its ACLs
 #   pveum role delete AutomationIso
 set -euo pipefail
 

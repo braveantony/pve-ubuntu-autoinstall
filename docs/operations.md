@@ -131,8 +131,8 @@ podman build -t localhost/pve-ubuntu-autoinstall:dev .
    ssh root@192.168.11.201 qm destroy 605
    ```
 
-3. 刪除 API 帳號與角色。使用者的權杖與權限設定會一併移除：
+3. 刪除 API 權杖、帳號與角色。權杖要先移除，因為只刪除使用者的話，PVE 會把權杖的密鑰紀錄留在 `/etc/pve/priv/token.cfg` 裡。使用者的權限設定會隨使用者一併移除：
 
    ```bash
-   ssh root@192.168.11.201 'pveum user delete automation@pve; pveum role delete AutomationIso'
+   ssh root@192.168.11.201 'pveum user token remove automation@pve iac; pveum user delete automation@pve; pveum role delete AutomationIso'
    ```

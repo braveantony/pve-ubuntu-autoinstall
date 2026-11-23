@@ -325,10 +325,10 @@ ssh root@192.168.11.201 'NODE=node5 VM_STORAGE=vmdata ISO_STORAGE=local BRIDGE=v
 <details>
 <summary>出現 <code>user automation@pve already exists</code></summary>
 
-這支腳本已經執行過。密鑰沒有留下來的話，先刪除帳號與角色，再重新執行：
+這支腳本已經執行過。密鑰沒有留下來的話，先刪除權杖、帳號與角色，再重新執行：
 
 ```bash
-ssh root@192.168.11.201 'pveum user delete automation@pve; pveum role delete AutomationIso'
+ssh root@192.168.11.201 'pveum user token remove automation@pve iac; pveum user delete automation@pve; pveum role delete AutomationIso'
 ```
 
 </details>
