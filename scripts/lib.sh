@@ -2,7 +2,7 @@
 # Sourced, not executed.
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-default_image="ghcr.io/braveantony/pve-ubuntu-autoinstall:v0.2.0"
+default_image="ghcr.io/braveantony/pve-ubuntu-autoinstall:v0.2.1"
 
 # load_overlay <name>: sets $overlay (name), $overlay_dir and $image, and
 # exports the variables in overlays/<name>/env.
