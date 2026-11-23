@@ -161,22 +161,94 @@ cd pve-ubuntu-autoinstall
 
 ## 3. 依你的環境修改設定
 
-和範例值相同的項目可以跳過。下表的檔案都是 HCL 格式，每個變數修改的是 `default = ` 後面的值。
+設定檔裡預先填好的是範例環境的值。這一章要把它們換成你在[步驟 1.4](#14-記下你的環境) 記下的值。你的環境和範例值完全相同的話，可以直接跳到第 4 章。
 
-| 項目 | 要修改的地方 |
+要改的檔案只有兩個：
+
+| 檔案 | 用途 |
 |---|---|
-| 放 VM 磁碟的 storage | `packer/variables.pkr.hcl` 的 `vm_storage`、`tofu/variables.tf` 的 `vm_storage` |
-| 安裝光碟 | `packer/variables.pkr.hcl` 的 `iso_file`，填步驟 1.5 查到的完整名稱 |
-| 種子光碟上傳到哪個 storage | `packer/variables.pkr.hcl` 的 `iso_storage`，通常和安裝光碟同一個 |
-| 橋接器 | `packer/variables.pkr.hcl` 的 `bridge`、`tofu/variables.tf` 的 `bridge` |
-| 建置範本時暫用的 IP、閘道、DNS | `packer/variables.pkr.hcl` 的 `build_ip_cidr`、`build_gateway`、`build_dns` |
-| 所有 VM 共用的閘道與 DNS | `tofu/variables.tf` 的 `gateway`、`dns_servers` |
-| 範本的名稱與規格 | `packer/variables.pkr.hcl` 的 `template_name`、`cores`、`memory`、`disk_size` |
-| Ubuntu 套件來源 | `packer/variables.pkr.hcl` 的 `apt_mirror` |
+| `packer/variables.pkr.hcl` | 建立範本時用的設定 |
+| `tofu/variables.tf` | 建立 VM 時用的設定 |
 
-PVE 節點的位址、節點名稱與**範本的 VMID** 不在這張表裡，它們填在下一步建立的 `.env`。
+### 3.1 修改的方法
 
-範本的 `disk_size` 改成大於 50G 時，`tofu/variables.tf` 裡 `vms` 的 `disk_gb` 預設值（50）也要跟著調高，因為 VM 的磁碟不能小於範本。
+兩個檔案的寫法相同。每一項設定是一個 `variable` 區塊，要改的是區塊裡 `default =` 後面的值，其他地方不要動。
+
+以「放 VM 磁碟的 storage」為例。用編輯器打開 `packer/variables.pkr.hcl`，找到這一段：
+
+```hcl
+variable "vm_storage" {
+  type    = string
+  default = "vmdata"
+}
+```
+
+假設你的 storage 叫 `local-lvm`，就改成：
+
+```hcl
+variable "vm_storage" {
+  type    = string
+  default = "local-lvm"
+}
+```
+
+值的寫法有三種，照原本的樣子改就不會錯：
+
+- **文字**：前後要有雙引號，例如 `"local-lvm"`。
+- **數字**：不加引號，例如 `4`。
+- **清單**：用中括號包住，例如 `["192.168.11.2"]`；有兩筆時寫成 `["192.168.11.2", "8.8.8.8"]`。
+
+### 3.2 修改 `packer/variables.pkr.hcl`
+
+打開檔案，依下表逐項檢查。「範例值」是檔案裡現在的值，和你的環境不同才需要改。
+
+| 變數 | 範例值 | 填什麼 |
+|---|---|---|
+| `vm_storage` | `"vmdata"` | 放 VM 磁碟的 storage 名稱 |
+| `bridge` | `"vmbr1"` | VM 要接的橋接器名稱 |
+| `iso_file` | `"local:iso/ubuntu-26.04-live-server-amd64.iso"` | 安裝光碟，填步驟 1.5 查到的完整名稱 |
+| `iso_storage` | `"local"` | 放 ISO 的 storage 名稱，也就是 `iso_file` 冒號前面那一段 |
+| `build_ip_cidr` | `"192.168.11.66/24"` | 建置範本時暫用的 IP，後面要加上網路遮罩的長度 |
+| `build_gateway` | `"192.168.11.254"` | 這個網段的閘道 |
+| `build_dns` | `"192.168.11.2"` | DNS 伺服器 |
+
+以下四項是範本本身的名稱與規格，想調整再改：
+
+| 變數 | 範例值 | 說明 |
+|---|---|---|
+| `template_name` | `"ub2604-ci-temp"` | 範本在 PVE 上顯示的名稱 |
+| `cores` | `4` | CPU 核心數 |
+| `memory` | `8192` | 記憶體，單位是 MB |
+| `disk_size` | `"50G"` | 磁碟大小。之後建立的 VM 磁碟只能和它一樣大或更大 |
+
+`apt_mirror` 是 Ubuntu 套件的下載來源，預設是台灣的鏡像站，不在台灣時可以換成離你較近的站。
+
+檔案裡其他的變數不要改，包含 `pve_` 開頭的四個、`template_vmid`、`boot_wait`，以及 `build_username`、`build_password`、`build_password_hash`。它們由腳本或 `.env` 提供。
+
+### 3.3 修改 `tofu/variables.tf`
+
+這個檔案只有四項要檢查：
+
+| 變數 | 範例值 | 填什麼 |
+|---|---|---|
+| `vm_storage` | `"vmdata"` | 和 3.2 的 `vm_storage` 填一樣的值 |
+| `bridge` | `"vmbr1"` | 和 3.2 的 `bridge` 填一樣的值 |
+| `gateway` | `"192.168.11.254"` | 所有 VM 共用的閘道 |
+| `dns_servers` | `["192.168.11.2"]` | 所有 VM 共用的 DNS 伺服器，這一項是清單 |
+
+範本的 `disk_size` 改成大於 50G 的話，這個檔案裡還要改一個地方：找到 `variable "vms"` 區塊裡的 `disk_gb = optional(number, 50)`，把 `50` 改成和範本一樣的數字。VM 的磁碟不能小於範本。
+
+其他的變數不要改。每台 VM 的名稱、IP 與帳號不在這裡設定，第 6 章會說明。
+
+### 3.4 檢查改了什麼
+
+```bash
+git diff packer/variables.pkr.hcl tofu/variables.tf
+```
+
+輸出裡 `-` 開頭的是原本的行，`+` 開頭的是你改後的行。確認每一處都只改到 `default =` 後面的值。沒有任何輸出代表兩個檔案都沒有變動。
+
+PVE 節點的位址、節點名稱與**範本的 VMID** 不在這兩個檔案裡，它們填在下一章建立的 `.env`。
 
 ## 4. 建立 API 權杖
 
