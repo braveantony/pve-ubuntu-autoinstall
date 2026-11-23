@@ -1,4 +1,4 @@
-# ubuntu-pve-vm-template
+# pve-ubuntu-autoinstall
 
 在 Proxmox VE（PVE）上，用設定檔全自動建立 Ubuntu Server 26.04 的 VM 範本，再從範本複製出 VM，並在複製時設定每台 VM 的網路、主機名稱與帳號。
 

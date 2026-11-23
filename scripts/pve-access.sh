@@ -30,7 +30,7 @@ pveum role add AutomationIso \
   -privs "Datastore.Audit,Datastore.AllocateTemplate,Datastore.AllocateSpace,Datastore.Allocate" >&2
 
 pveum user add "${PVE_USER}" \
-  --comment "Packer/OpenTofu automation for ubuntu-pve-vm-template" >&2
+  --comment "Packer/OpenTofu automation for pve-ubuntu-autoinstall" >&2
 
 # Create, configure, clone, start/stop and template VMs.
 pveum acl modify /vms -user "${PVE_USER}" -role PVEVMAdmin >&2

@@ -150,11 +150,11 @@ dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9
 
 ## 2. 取得 repo
 
-回到工作機，把這個 repo 複製下來。`REPO_URL` 換成你存放這個 repo 的位址：
+回到工作機，把這個 repo 複製下來：
 
 ```bash
-git clone "$REPO_URL" ubuntu-pve-vm-template
-cd ubuntu-pve-vm-template
+git clone https://github.com/braveantony/pve-ubuntu-autoinstall.git
+cd pve-ubuntu-autoinstall
 ```
 
 之後的指令都在這個目錄下執行。
