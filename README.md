@@ -23,7 +23,7 @@ scripts/tofu.sh apply       # 從範本建立 VM
 
 在驗證用的環境裡，建立範本約 8 分鐘，建立一台 VM 約 1 分鐘。
 
-從零開始的完整步驟，包含事前檢查、依環境修改設定、建立 API 權杖與驗證結果，請看[建置手冊](docs/getting-started.md)。
+從零開始的完整步驟，包含事前檢查、依環境修改設定、建立 API 權杖與驗證結果，請看[建置手冊](docs/getting-started.md)。建好之後的新增、調整與刪除，請看[日常操作](docs/operations.md)。
 
 ## How It Works
 
