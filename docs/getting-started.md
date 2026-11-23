@@ -32,7 +32,12 @@
 - PVE 節點：一台運作中的 Proxmox VE 主機，VM 就執行在它上面。手冊裡的指令與輸出範例以 PVE 9.2 為準，其他版本的畫面與輸出可能略有不同。
 - 工作機：一台 Linux，用來執行這個 repo 的腳本。它要和 PVE 節點、VM 所在的網段互通。
 
-手冊裡所有的指令都在工作機上執行。需要在 PVE 節點上執行的指令，都寫成 `ssh root@192.168.11.201 <指令>` 的形式，從工作機送過去。
+手冊裡的指令分成兩種：
+
+- 沒有標示的指令：在工作機上執行。
+- 第一行是 `# 在 PVE 節點上執行` 的指令：先登入 PVE 節點再執行，需要 root 或有管理權限的帳號。登入方式見[步驟 2.1](#21-登入-pve-節點)。
+
+工作機不需要能免密碼登入 PVE 節點。建置範本與建立 VM 都是透過 PVE 的 API 進行，用的是步驟 4.1 建立的權杖，權限只限於這個專案需要的範圍。
 
 指令和輸出範例用的是 repo 裡範例環境的值，例如 PVE 節點的 IP 是 `192.168.11.201`。[步驟 2.2](#22-查出環境值) 會帶你查出自己的值。
 
@@ -57,7 +62,7 @@ Packer（建置範本的工具）與 OpenTofu（依設定檔建立並管理 VM �
 
 ### 1.2 準備 SSH 金鑰
 
-這把金鑰有兩個用途：登入 PVE 節點，以及之後登入每台 VM。先看工作機有沒有金鑰：
+這把金鑰用來登入之後建立的每台 VM，不會用來登入 PVE 節點。先看工作機有沒有金鑰：
 
 ```bash
 ls ~/.ssh/id_*.pub
@@ -82,33 +87,23 @@ cd pve-ubuntu-autoinstall
 
 ## 2. 檢查 PVE 並記下環境
 
-### 2.1 設定免密碼登入 PVE
+### 2.1 登入 PVE 節點
 
-把公鑰裝到 PVE 節點，會問一次 root 的密碼：
+這一章與之後少數幾個步驟要在 PVE 節點上執行指令。用 root 或有管理權限的帳號登入節點，方式任選一種：
+
+- 在 PVE 網頁的左側點選節點，再點選右側的「Shell」。
+- 用你平常管理這台主機的方式登入，例如 SSH 或主機的 Console。
+
+登入後確認可以執行 PVE 的管理指令：
 
 ```bash
-ssh-copy-id root@192.168.11.201
-```
-
-確認不用密碼就能執行指令：
-
-```bash
-ssh root@192.168.11.201 pveversion
+# 在 PVE 節點上執行
+pveversion
 ```
 
 印出 `pve-manager/` 開頭的一行就是成功。
 
-<details>
-<summary>用非 root 帳號登入 PVE</summary>
-
-可以改用其他帳號，條件是它在 PVE 節點上能免密碼執行 `sudo`。這時手冊裡的指令要調整兩處：
-
-- `root@192.168.11.201` 換成那個帳號，例如 `bigred@192.168.11.201`。
-- PVE 的管理指令（`qm`、`pvesm`、`pvesh`、`pveum`）前面加上 `sudo`，例如 `ssh bigred@192.168.11.201 sudo pvesm status`。
-
-步驟 4.1 的指令寫法不同，那裡會另外說明。
-
-</details>
+用非 root 帳號登入時，在 PVE 的管理指令（`qm`、`pvesm`、`pvesh`、`pveum`）前面加上 `sudo`，例如 `sudo pvesm status`。
 
 ### 2.2 查出環境值
 
@@ -117,7 +112,8 @@ ssh root@192.168.11.201 pveversion
 #### 節點名稱
 
 ```bash
-ssh root@192.168.11.201 hostname
+# 在 PVE 節點上執行
+hostname
 ```
 
 輸出就是節點名稱，範例是 `node5`。
@@ -129,7 +125,8 @@ storage 是 PVE 存放資料的位置，每個 storage 會設定可以放哪些�
 列出可以放 VM 磁碟的 storage：
 
 ```bash
-ssh root@192.168.11.201 pvesm status --content images
+# 在 PVE 節點上執行
+pvesm status --content images
 ```
 
 ```
@@ -143,7 +140,8 @@ vmdata        lvmthin     active      1919827968       910190439      1009637528
 列出可以放 ISO 的 storage，同樣選一個：
 
 ```bash
-ssh root@192.168.11.201 pvesm status --content iso
+# 在 PVE 節點上執行
+pvesm status --content iso
 ```
 
 範例選 `local`。
@@ -153,7 +151,8 @@ ssh root@192.168.11.201 pvesm status --content iso
 橋接器是 PVE 節點上的虛擬交換器，VM 的網卡接到哪個橋接器，就連到哪個網路。
 
 ```bash
-ssh root@192.168.11.201 ip -br link show type bridge | grep -v '^fwbr'
+# 在 PVE 節點上執行
+ip -br link show type bridge | grep -v '^fwbr'
 ```
 
 ```
@@ -170,7 +169,8 @@ vmbr1            UP             74:56:3c:ff:03:e8 <BROADCAST,MULTICAST,UP,LOWER_
 VMID 是 PVE 用來識別 VM 或容器的數字，同一個叢集內不能重複。列出已被使用的：
 
 ```bash
-ssh root@192.168.11.201 pvesh get /cluster/resources --type vm --noborder | awk 'NR>1{print $1}'
+# 在 PVE 節點上執行
+pvesh get /cluster/resources --type vm --noborder | awk 'NR>1{print $1}'
 ```
 
 ```
@@ -212,7 +212,8 @@ IP 後面的 `/24` 是網路遮罩的長度，等同 `255.255.255.0`。
 確認安裝光碟已經在放 ISO 的 storage 裡。把 `local` 換成你的 storage 名稱：
 
 ```bash
-ssh root@192.168.11.201 pvesm list local --content iso | grep ubuntu-26.04
+# 在 PVE 節點上執行
+pvesm list local --content iso | grep ubuntu-26.04
 ```
 
 ```
@@ -304,13 +305,23 @@ Packer 與 OpenTofu 透過 PVE 的 API 操作，需要一組 API 權杖（token�
 
 ### 4.1 建立 API 權杖
 
-`scripts/pve-access.sh` 會在 PVE 上建立一個專用帳號，並只開放這個專案需要的權限。執行以下指令，把 `NODE`、`VM_STORAGE`、`ISO_STORAGE`、`BRIDGE` 換成步驟 2.2 記下的節點名稱、兩個 storage 與橋接器：
+`scripts/pve-access.sh` 會在 PVE 上建立一個專用帳號，並只開放這個專案需要的權限。這支腳本要在 PVE 節點上以 root 執行，執行前建議先讀過內容。
 
-```bash
-ssh root@192.168.11.201 'NODE=node5 VM_STORAGE=vmdata ISO_STORAGE=local BRIDGE=vmbr1 bash -s' < scripts/pve-access.sh
-```
+1. 把腳本放到 PVE 節點上。可以用 `scp` 複製過去，會問一次那個帳號的密碼；也可以在節點上開一個新檔案，把腳本內容貼進去：
 
-用非 root 帳號時，引號裡的開頭改成 `sudo env NODE=node5 ...`，其餘相同。
+   ```bash
+   scp scripts/pve-access.sh root@192.168.11.201:/tmp/
+   ```
+
+2. 在節點上執行。把 `NODE`、`VM_STORAGE`、`ISO_STORAGE`、`BRIDGE` 換成步驟 2.2 記下的節點名稱、兩個 storage 與橋接器：
+
+   ```bash
+   # 在 PVE 節點上執行
+   NODE=node5 VM_STORAGE=vmdata ISO_STORAGE=local BRIDGE=vmbr1 bash /tmp/pve-access.sh
+   rm /tmp/pve-access.sh
+   ```
+
+   用非 root 帳號時，第一個指令的開頭改成 `sudo env NODE=node5 ...`，其餘相同。
 
 輸出的最後一行是一段 JSON：
 
@@ -318,7 +329,7 @@ ssh root@192.168.11.201 'NODE=node5 VM_STORAGE=vmdata ISO_STORAGE=local BRIDGE=v
 {"full-tokenid":"automation@pve!iac","info":{"privsep":"0"},"value":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}
 ```
 
-`value` 後面那串是權杖的密鑰，**只會顯示這一次**。先不要關掉這個終端機視窗，下一步要把它貼進 `env`。
+`value` 後面那串是權杖的密鑰，**只會顯示這一次**。先不要關掉這個視窗，下一步要把它貼進工作機上的 `env`。
 
 權杖的權限範圍請看[運作原理的「API 權杖的權限」](how-it-works.md#api-權杖的權限)。
 
@@ -328,7 +339,10 @@ ssh root@192.168.11.201 'NODE=node5 VM_STORAGE=vmdata ISO_STORAGE=local BRIDGE=v
 這支腳本已經執行過。密鑰沒有留下來的話，先刪除權杖、帳號與角色，再重新執行：
 
 ```bash
-ssh root@192.168.11.201 'pveum user token remove automation@pve iac; pveum user delete automation@pve; pveum role delete AutomationIso'
+# 在 PVE 節點上執行
+pveum user token remove automation@pve iac
+pveum user delete automation@pve
+pveum role delete AutomationIso
 ```
 
 </details>
@@ -351,7 +365,6 @@ ssh root@192.168.11.201 'pveum user token remove automation@pve iac; pveum user 
    | `PVE_TOKEN_ID` | 上一步輸出的 `full-tokenid`，保留前後的單引號 |
    | `PVE_TOKEN_SECRET` | 上一步輸出的 `value`，貼在兩個單引號中間 |
    | `TEMPLATE_VMID` | 範本的 VMID |
-   | `PVE_SSH` | 登入 PVE 節點的帳號與位址 |
    | `SSH_PUBLIC_KEY_FILE` | 步驟 1.2 記下的公鑰路徑。先刪掉這一行開頭的 `#` 再改 |
 
    填好之後，有效的幾行會長這樣：
@@ -362,7 +375,6 @@ ssh root@192.168.11.201 'pveum user token remove automation@pve iac; pveum user 
    PVE_TOKEN_ID='automation@pve!iac'
    PVE_TOKEN_SECRET='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
    TEMPLATE_VMID=605
-   PVE_SSH=root@192.168.11.201
    SSH_PUBLIC_KEY_FILE=~/.ssh/id_ed25519.pub
    ```
 
@@ -424,7 +436,8 @@ scripts/build-template.sh lab
 完成後確認範本存在。把 `605` 換成你的範本 VMID：
 
 ```bash
-ssh root@192.168.11.201 qm config 605 | grep -E '^(name|template|scsi0)'
+# 在 PVE 節點上執行
+qm config 605 | grep -E '^(name|template|scsi0)'
 ```
 
 ```
@@ -588,6 +601,13 @@ scripts/verify.sh lab
 Result: 35 passed, 0 failed
 ```
 
+這支腳本是測試用的工具，不是建置流程的一部分。它會從工作機用 SSH 登入 PVE 節點讀取 VM 設定，所以要另外準備：
+
+- 工作機能用 SSH 金鑰登入 PVE 節點，帳號是 root 或可以免密碼執行 `sudo` 的帳號。
+- 在 `env` 加一行 `PVE_SSH=<帳號>@<PVE 節點的 IP>`。
+
+讓工作機免密碼登入 PVE 節點，等於把節點的管理權限交給工作機。這只適合測試環境，正式環境不建議為了這支腳本開放。
+
 其中一部分是比對硬體設定，執行前要先知道：
 
 - 需要一台手動建立的 VM 或範本當對照組，預設是 VMID 604。用其他 VMID 時執行 `REFERENCE_VMID=100 scripts/verify.sh lab`。
@@ -608,13 +628,7 @@ Result: 35 passed, 0 failed
 
 ### 建置範本時卡住
 
-先看 VM 目前的畫面：[打開 VM 的 Console](#打開-vm-的-console)，或擷取成圖片：
-
-```bash
-scripts/vm-screenshot.sh lab 605 screen.png
-```
-
-依畫面判斷。處理完後，按 Ctrl+C 中止還在等待的建置指令，再重新執行。
+先[打開 VM 的 Console](#打開-vm-的-console) 看 VM 目前的畫面，再依畫面判斷。處理完後，按 Ctrl+C 中止還在等待的建置指令，再重新執行。
 
 #### 停在開機選單、進入手動安裝畫面，或出現 `Continue with autoinstall?`
 
@@ -636,7 +650,7 @@ autoinstall 設定有誤，常見於修改磁碟配置之後。檢查你的 `use
 PACKER_LOG=1 scripts/build-template.sh lab
 ```
 
-建置失敗或被中止時，Packer 會嘗試刪除建到一半的 VM。重新執行前，先執行 `ssh root@192.168.11.201 qm config 605`，出現 `does not exist` 代表它已經不存在。
+建置失敗或被中止時，Packer 會嘗試刪除建到一半的 VM。重新執行前，先在 PVE 節點上執行 `qm config 605`，出現 `does not exist` 代表它已經不存在。
 
 ### `VMID 605 already exists`
 

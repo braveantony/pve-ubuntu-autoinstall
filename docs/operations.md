@@ -4,6 +4,8 @@
 
 指令裡的 `lab` 是 overlay 的名稱，檔案路徑也都以 `overlays/lab/` 為例，請換成你自己的。
 
+沒有標示的指令在工作機上執行。第一行是 `# 在 PVE 節點上執行` 的指令，要用 root 或有管理權限的帳號登入 PVE 節點後執行；非 root 帳號請在指令前加上 `sudo`。
+
 VM 的新增、調整與刪除都是同一個流程：修改 `overlays/lab/vms.tfvars`，執行 `scripts/tofu.sh lab plan` 看它打算做什麼，確認無誤後執行 `scripts/tofu.sh lab apply`。
 
 `plan` 最後一行的數字和你預期的不同時，**先不要執行 `apply`**。尤其是出現你沒打算刪除的 `to destroy`，或某台 VM 標示為 `must be replaced`（先刪除再重建，資料會消失）。
@@ -63,7 +65,8 @@ VM 的新增、調整與刪除都是同一個流程：修改 `overlays/lab/vms.t
 1. 確認那個 VMID 確實是這個專案的範本。把 `605` 換成你的範本 VMID：
 
    ```bash
-   ssh root@192.168.11.201 qm config 605 | grep -E '^(name|template)'
+   # 在 PVE 節點上執行
+   qm config 605 | grep -E '^(name|template)'
    ```
 
    名稱要是你設定的 `template_name`（預設是 `ub2604-ci-temp`），而且有 `template: 1`。
@@ -71,7 +74,8 @@ VM 的新增、調整與刪除都是同一個流程：修改 `overlays/lab/vms.t
 2. 兩項都符合，才刪除：
 
    ```bash
-   ssh root@192.168.11.201 qm destroy 605
+   # 在 PVE 節點上執行
+   qm destroy 605
    ```
 
 3. 執行 `scripts/build-template.sh lab`。
@@ -128,11 +132,15 @@ podman build -t localhost/pve-ubuntu-autoinstall:dev .
 2. 刪除範本。先照[重建範本](#重建範本)的第 1 步確認 VMID，再執行：
 
    ```bash
-   ssh root@192.168.11.201 qm destroy 605
+   # 在 PVE 節點上執行
+   qm destroy 605
    ```
 
 3. 刪除 API 權杖、帳號與角色。權杖要先移除，因為只刪除使用者的話，PVE 會把權杖的密鑰紀錄留在 `/etc/pve/priv/token.cfg` 裡。使用者的權限設定會隨使用者一併移除：
 
    ```bash
-   ssh root@192.168.11.201 'pveum user token remove automation@pve iac; pveum user delete automation@pve; pveum role delete AutomationIso'
+   # 在 PVE 節點上執行
+   pveum user token remove automation@pve iac
+   pveum user delete automation@pve
+   pveum role delete AutomationIso
    ```
