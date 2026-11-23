@@ -1,0 +1,34 @@
+# Build the tools image from the Containerfile and push it to GHCR whenever a
+# release tag is pushed. The image tag equals the git tag (for example v0.1.0),
+# which is what scripts/build-template.sh and scripts/tofu.sh are pinned to.
+name: Image
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Containerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}

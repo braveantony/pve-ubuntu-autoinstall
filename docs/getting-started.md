@@ -58,7 +58,7 @@ sudo apt update
 sudo apt install -y git podman curl jq openssh-client openssl python3
 ```
 
-Packer 與 OpenTofu 不用安裝，腳本會用 podman 下載它們的容器映像檔來執行。
+Packer 與 OpenTofu 不用安裝。它們和各自的 Proxmox 外掛都包在同一個容器映像檔 `ghcr.io/braveantony/pve-ubuntu-autoinstall` 裡，腳本第一次執行時會用 podman 下載它。這個映像檔只提供 x86-64 版本。想自己建置映像檔的話，在 repo 根目錄執行 `podman build -t <名稱> .`，再把 `.env` 的 `TOOLS_IMAGE` 設成那個名稱。
 
 ### 1.2 選定一把 SSH 金鑰
 
@@ -250,7 +250,7 @@ Git 預設會忽略 `.env`，它不會出現在 `git status` 裡。
 scripts/build-template.sh
 ```
 
-第一次執行會下載 Packer 的容器映像檔與 Proxmox 外掛，所以工作機要能連到網際網路。接著 Packer 會自動完成所有步驟，中途不需要操作。正常的輸出依序會出現這幾行：
+第一次執行會下載容器映像檔（約 300 MB），所以工作機要能連到網際網路。接著 Packer 會自動完成所有步驟，中途不需要操作。正常的輸出依序會出現這幾行：
 
 ```
 ==> proxmox-iso.ubuntu: Creating VM
@@ -334,7 +334,7 @@ vm_password_hashes = {
 ## 7. 建立 VM
 
 ```bash
-scripts/tofu.sh init    # 初始化並下載 Proxmox 外掛，只有第一次需要
+scripts/tofu.sh init    # 初始化，只有第一次需要
 scripts/tofu.sh plan    # 預覽會建立、修改或刪除哪些 VM
 scripts/tofu.sh apply   # 執行，確認後輸入 yes
 ```
@@ -545,7 +545,7 @@ VM 開機失敗，或 cloud-init 沒有套用網路設定時，OpenTofu 會一�
 | `.env` | PVE 位址與 API 權杖 |
 | `tofu/secrets.auto.tfvars` | 每台 VM 的密碼雜湊 |
 | `tofu/terraform.tfstate` | OpenTofu 的狀態檔，記錄它管理的每台 VM，裡面也有密碼雜湊 |
-| `.cache/` | Packer 與 OpenTofu 下載的外掛 |
+| `.cache/` | Packer 的暫存檔 |
 
 狀態檔只存在工作機上，沒有遠端備份。遺失後，OpenTofu 就不知道哪些 VM 歸它管理，請自行備份。
 

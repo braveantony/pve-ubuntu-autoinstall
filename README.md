@@ -9,7 +9,7 @@
 - **Template as Code**：範本的硬體規格、磁碟配置、套件與清理步驟全部寫在設定檔裡並納入版本控制。同一份設定可以重複執行相同的建置流程，改動有紀錄可追。
 - **Same as a Manual Install**：用官方安裝光碟與安裝程式建置，磁碟配置、核心套件、開機參數與 Console 行為都和手動安裝的系統相同。既有的維運方式與操作習慣都不用改。
 - **Declarative VM Lifecycle**：所有 VM 列在一份清單裡，每台的 IP、帳號與規格各自定義。新增、調整、刪除 VM 都是修改清單後重新套用。
-- **Nothing to Install**：Packer、OpenTofu 與它們的外掛都從容器映像檔執行，版本固定在 repo 裡。工作機只需要 podman 這類常見工具，PVE 節點不需要安裝任何套件。
+- **Nothing to Install**：Packer、OpenTofu 與它們的外掛都包在同一個容器映像檔裡，版本固定在 repo 裡。工作機只需要 podman 這類常見工具，PVE 節點不需要安裝任何套件。
 
 ## To start using
 
