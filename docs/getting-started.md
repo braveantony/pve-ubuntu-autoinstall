@@ -68,13 +68,21 @@ Packer 與 OpenTofu 不用安裝。它們和各自的 Proxmox 外掛都包在同
 ls ~/.ssh/id_*.pub
 ```
 
-沒有的話，建立一把：
+已經有金鑰時，會列出公鑰的路徑：
+
+```
+/home/bigred/.ssh/id_ed25519.pub
+```
+
+出現 `No such file or directory` 代表還沒有金鑰，建立一把：
 
 ```bash
 ssh-keygen -t ed25519
 ```
 
-**記下你要用的公鑰路徑**，例如 `~/.ssh/id_ed25519.pub`，步驟 4.2 要填。有多把金鑰時，選一把即可。
+它會問三個問題。第一個是存放位置，直接按 Enter 使用預設的 `~/.ssh/id_ed25519`。後兩個是金鑰的保護密碼，不設定的話連按兩次 Enter。
+
+**記下公鑰的路徑**，也就是結尾是 `.pub` 的那個檔案，例如 `~/.ssh/id_ed25519.pub`，步驟 4.2 要填。有多把金鑰時，選一把即可。
 
 ### 1.3 能用 SSH 登入 PVE 節點
 
@@ -101,24 +109,110 @@ pve-manager/9.2.28/310cfbc506c4490f (running kernel: 7.0.12-1-pve)
 
 ### 1.4 記下你的環境
 
-在 PVE 節點上執行以下指令，把結果記下來。和範例值相同的項目，之後不用修改。
+這一步要查出六個值，後面的章節會用到。先登入 PVE 節點：
 
-| 要查的項目 | 在 PVE 節點上執行 |
-|---|---|
-| 節點名稱 | `hostname` |
-| 有哪些 storage、各自能放什麼 | `pvesm status`，以及 `cat /etc/pve/storage.cfg` 裡每個 storage 的 `content` |
-| 有哪些橋接器 | `ip -br link show type bridge \| grep -v '^fwbr'` |
-| 哪些 VMID 已被使用 | `pvesh get /cluster/resources --type vm --noborder \| awk 'NR>1{print $1}'` |
+```bash
+ssh root@192.168.11.201
+```
 
-選擇時的條件：
+以下四個指令都在 PVE 節點上執行。
 
-- **放 VM 磁碟的 storage**：`content` 要包含 `images`。
-- **放 ISO 的 storage**：`content` 要包含 `iso`。
-- **範本的 VMID**：選一個沒出現在清單裡的數字。清單涵蓋整個叢集的 VM 與容器。
-- **建置範本時暫用的 IP**：建置期間 VM 會使用一個固定 IP，工作機靠它連進 VM。它必須和工作機互通，而且沒有其他裝置在用。預設是 `192.168.11.66`。
+**節點名稱**
+
+```bash
+hostname
+```
+
+```
+node5
+```
+
+輸出的這一行就是節點名稱。
+
+**storage**
+
+```bash
+pvesm status
+```
+
+```
+Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
+local             dir     active       205839152        84356420       112189396   40.98%
+vmdata        lvmthin     active      1919827968       910190439      1009637528   47.41%
+```
+
+`Name` 欄是 storage 的名稱，只有 `Status` 是 `active` 的才能用。接著看每個 storage 可以放什麼：
+
+```bash
+cat /etc/pve/storage.cfg
+```
+
+```
+dir: local
+	path /var/lib/vz
+	content import,backup,vztmpl,iso,images
+
+lvmthin: vmdata
+	thinpool vmdata
+	vgname vmdata
+	content images,rootdir
+```
+
+每一段的第一行冒號後面是 storage 名稱，`content` 那一行是它能放的內容。要選出兩個 storage：
+
+- **放 VM 磁碟的 storage**：`content` 裡有 `images` 的。範例選 `vmdata`。
+- **放 ISO 的 storage**：`content` 裡有 `iso` 的。範例選 `local`。
+
+**橋接器**
+
+```bash
+ip -br link show type bridge | grep -v '^fwbr'
+```
+
+```
+vmbr0            UP             00:e0:4c:68:1a:f4 <BROADCAST,MULTICAST,UP,LOWER_UP>
+vmbr1            UP             74:56:3c:ff:03:e8 <BROADCAST,MULTICAST,UP,LOWER_UP>
+```
+
+第一欄是橋接器的名稱。選 VM 要連的那個網路所在的橋接器；不確定的話，到 PVE 網頁點選一台已經在那個網路上的 VM，看「Hardware」頁面裡網卡的 `bridge=` 是哪一個。範例選 `vmbr1`。
+
+**已被使用的 VMID**
+
+```bash
+pvesh get /cluster/resources --type vm --noborder | awk 'NR>1{print $1}'
+```
+
+```
+qemu/601
+qemu/602
+qemu/604
+lxc/700
+```
+
+斜線後面的數字就是已被使用的 VMID，清單涵蓋整個叢集的 VM 與容器。選一個沒出現在清單裡的數字當範本的 VMID，範例選 605。之後每台 VM 也各需要一個沒被使用的 VMID。
+
+**IP、閘道與 DNS**
+
+這三項沒有指令可以查，要依你的網路規劃決定：
+
+- **建置範本時暫用的 IP**：建置期間 VM 會使用一個固定 IP，工作機靠它連進 VM。它必須和工作機互通，而且沒有其他裝置在用。範例是 `192.168.11.66`。
 - **每台 VM 的 IP**：同樣不能和現有的機器重複。
+- **閘道與 DNS**：和同一個網段上其他機器使用的相同。
 
 確認 IP 可用時，請以你的 IP 分配紀錄或 DNS 紀錄為準。`ping` 只能知道當下有沒有裝置回應，關機中的機器、或不回應 ping 的裝置都查不出來。
+
+**把查到的值記下來**
+
+| 項目 | 範例值 | 之後用在哪裡 |
+|---|---|---|
+| 節點名稱 | `node5` | 步驟 4.1、4.2 |
+| 放 VM 磁碟的 storage | `vmdata` | 第 3 章、步驟 4.1 |
+| 放 ISO 的 storage | `local` | 步驟 1.5、第 3 章、步驟 4.1 |
+| 橋接器 | `vmbr1` | 第 3 章、步驟 4.1 |
+| 範本的 VMID | `605` | 步驟 4.2 |
+| 建置時暫用的 IP、閘道、DNS | `192.168.11.66/24`、`192.168.11.254`、`192.168.11.2` | 第 3 章 |
+
+先不要登出，下一步也在 PVE 節點上執行。
 
 ### 1.5 安裝光碟在 PVE 上
 
@@ -150,7 +244,7 @@ dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9
 
 ## 2. 取得 repo
 
-回到工作機，把這個 repo 複製下來：
+在 PVE 節點上輸入 `exit` 回到工作機，把這個 repo 複製下來：
 
 ```bash
 git clone https://github.com/braveantony/pve-ubuntu-autoinstall.git
@@ -256,48 +350,78 @@ Packer 與 OpenTofu 透過 PVE 的 API 操作，需要一組 API 權杖（token�
 
 ### 4.1 在 PVE 上建立專用帳號與權杖
 
+`scripts/pve-access.sh` 會在 PVE 上建立一個專用帳號，並只開放這個專案需要的權限。它要知道步驟 1.4 記下的四個值，才能把權限設在正確的對象上：
+
+| 變數 | 範例值 | 填什麼 |
+|---|---|---|
+| `NODE` | `node5` | 節點名稱 |
+| `VM_STORAGE` | `vmdata` | 放 VM 磁碟的 storage |
+| `ISO_STORAGE` | `local` | 放 ISO 的 storage |
+| `BRIDGE` | `vmbr1` | 橋接器 |
+
+在工作機上執行以下指令，把四個等號後面的值和 `root@192.168.11.201` 換成你的：
+
 ```bash
-ssh root@192.168.11.201 'bash -s' < scripts/pve-access.sh
+ssh root@192.168.11.201 'NODE=node5 VM_STORAGE=vmdata ISO_STORAGE=local BRIDGE=vmbr1 bash -s' < scripts/pve-access.sh
 ```
 
-你的節點名稱、storage 或橋接器和範例值不同時，在前面加上對應的變數：
+用非 root 帳號登入 PVE 時，引號裡的開頭多加 `sudo env`：
 
 ```bash
-ssh root@192.168.11.201 'NODE=pve1 VM_STORAGE=local-lvm ISO_STORAGE=local BRIDGE=vmbr0 bash -s' < scripts/pve-access.sh
+ssh bigred@192.168.11.201 'sudo env NODE=node5 VM_STORAGE=vmdata ISO_STORAGE=local BRIDGE=vmbr1 bash -s' < scripts/pve-access.sh
 ```
 
-用非 root 帳號時，引號裡的指令分別改成 `sudo bash -s` 與 `sudo env NODE=pve1 VM_STORAGE=local-lvm ISO_STORAGE=local BRIDGE=vmbr0 bash -s`。
-
-輸出的最後是一段 JSON：
+輸出的最後一行是一段 JSON：
 
 ```json
 {"full-tokenid":"automation@pve!iac","info":{"privsep":"0"},"value":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}
 ```
 
-`value` 是權杖的密鑰，**只會顯示這一次**，請立刻複製。
+下一步會用到其中兩個值：
+
+- `full-tokenid` 後面的 `automation@pve!iac` 是權杖的 ID。
+- `value` 後面那串是權杖的密鑰，**只會顯示這一次**。先不要關掉這個終端機視窗，下一步要把它貼進 `.env`。
 
 這支腳本在 PVE 上建立了三樣東西：使用者 `automation@pve`、角色 `AutomationIso`、權杖 `automation@pve!iac`。權杖的權限範圍請看[運作原理的「API 權杖的權限」](how-it-works.md#api-權杖的權限)。
 
+出現 `user automation@pve already exists` 代表這支腳本已經執行過。密鑰沒有留下來的話，照[全部移除](#全部移除)的最後一個指令刪除帳號與角色，再重新執行。
+
 ### 4.2 填寫連線資訊
+
+從範例檔複製一份 `.env`，並設成只有自己能讀取：
 
 ```bash
 cp env.example .env
 chmod 600 .env
 ```
 
-用編輯器打開 `.env`。這個檔案的格式是 `名稱=值`，填入：
+用編輯器打開 `.env`。每一行的格式是 `名稱=值`，等號兩邊不能有空格；`#` 開頭的行是說明，不會生效。依下表修改每一行等號後面的值：
 
 | 變數 | 填什麼 |
 |---|---|
-| `PVE_ENDPOINT` | `https://<PVE 節點的 IP>:8006` |
+| `PVE_ENDPOINT` | `https://`、PVE 節點的 IP、`:8006` 接在一起 |
 | `PVE_NODE` | 節點名稱 |
-| `PVE_TOKEN_ID` | 上一步輸出的 `full-tokenid` |
-| `PVE_TOKEN_SECRET` | 上一步輸出的 `value` |
-| `TEMPLATE_VMID` | 範本的 VMID。建立範本與複製 VM 都以這裡的值為準 |
-| `PVE_SSH` | 步驟 1.3 用來登入 PVE 節點的帳號與位址，例如 `root@192.168.11.201` |
-| `SSH_PUBLIC_KEY_FILE` | 步驟 1.2 選定的公鑰路徑。拿掉這一行開頭的 `#` 再填。不填時使用 `~/.ssh/id_rsa.pub` |
+| `PVE_TOKEN_ID` | 上一步輸出的 `full-tokenid`。保留前後的單引號，因為內容有 `!` |
+| `PVE_TOKEN_SECRET` | 上一步輸出的 `value`，貼在兩個單引號中間 |
+| `TEMPLATE_VMID` | 步驟 1.4 選定的範本 VMID |
+| `PVE_SSH` | 步驟 1.3 用來登入 PVE 節點的帳號與位址 |
+| `SSH_PUBLIC_KEY_FILE` | 步驟 1.2 記下的公鑰路徑。這一行開頭有 `#`，要先刪掉 `#` 再改 |
 
-確認公鑰路徑正確，以及權杖能讀取節點狀態：
+`TOOLS_IMAGE` 那一行維持 `#` 開頭，不用改。
+
+填好之後，有效的幾行會長這樣：
+
+```bash
+PVE_ENDPOINT=https://192.168.11.201:8006
+PVE_NODE=node5
+PVE_TOKEN_ID='automation@pve!iac'
+PVE_TOKEN_SECRET='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+TEMPLATE_VMID=605
+PVE_SSH=root@192.168.11.201
+SSH_PUBLIC_KEY_FILE=~/.ssh/id_ed25519.pub
+```
+
+存檔後，確認公鑰路徑正確，以及權杖能讀取節點狀態：
 
 ```bash
 set -a; . ./.env; set +a
@@ -307,12 +431,21 @@ curl -sk -o /dev/null -w '%{http_code}\n' \
   "${PVE_ENDPOINT}/api2/json/nodes/${PVE_NODE}/status"
 ```
 
+正確的結果是這兩行：
+
 ```
 公鑰 OK
 200
 ```
 
-出現 `401` 代表權杖的 ID 或密鑰填錯；出現 `403` 或其他數字，代表節點名稱不對或權限沒有建立成功。
+結果不同時，對照下表修正 `.env` 後再執行一次：
+
+| 結果 | 原因 | 要檢查的變數 |
+|---|---|---|
+| 沒有出現 `公鑰 OK` | 公鑰檔不存在 | `SSH_PUBLIC_KEY_FILE` |
+| `401` | 權杖的 ID 或密鑰不對 | `PVE_TOKEN_ID`、`PVE_TOKEN_SECRET` |
+| `403` 或其他數字 | 節點名稱不對，或步驟 4.1 的權限沒有建立成功 | `PVE_NODE` |
+| `000` | 連不到 PVE | `PVE_ENDPOINT` |
 
 Git 預設會忽略 `.env`，它不會出現在 `git status` 裡。
 
@@ -344,6 +477,8 @@ scripts/build-template.sh
 qm config 605 | grep -E '^(name|template|scsi0|ide0)'
 ```
 
+把 `605` 換成你的範本 VMID。輸出要有 `template: 1`，名稱與磁碟大小要和第 3 章的設定相同：
+
 ```
 ide0: vmdata:vm-605-cloudinit,media=cdrom
 name: ub2604-ci-temp
@@ -351,74 +486,175 @@ scsi0: vmdata:base-605-disk-0,cache=none,iothread=1,replicate=0,size=50G
 template: 1
 ```
 
+沒有出現 `Converting VM to template`，或指令以錯誤結束時，請看[除錯](#除錯)。
+
 預設的磁碟配置是根目錄放在 LVM 上、用滿整顆磁碟。使用預設配置的話，直接進行下一步。想把 `/var` 這類目錄分到獨立的磁碟區，請看[進階：修改磁碟配置](#進階修改磁碟配置)。
 
 ## 6. 定義 VM
 
+要建立哪些 VM，寫在兩個檔案裡：
+
+| 檔案 | 內容 |
+|---|---|
+| `tofu/vms.auto.tfvars` | VM 清單：每台的名稱、VMID、IP、帳號與規格 |
+| `tofu/secrets.auto.tfvars` | 每台 VM 帳號的密碼雜湊 |
+
 ### 6.1 VM 清單
 
-VM 列在 `tofu/vms.auto.tfvars`，每台一個區塊。區塊的名稱就是 VM 名稱，也是主機名稱：
+用編輯器打開 `tofu/vms.auto.tfvars`。裡面有 `ub2604-ci-test1`、`ub2604-ci-test2` 兩個區塊，它們是驗證用的範例。把這兩個區塊刪掉，換成你要的 VM，每台一個區塊。
+
+以建立 `web-01`、`db-01` 兩台為例，整個檔案改成這樣：
 
 ```hcl
 vms = {
   web-01 = {
-    vmid      = 615
-    ip_cidr   = "192.168.11.67/24"
+    vmid     = 615
+    ip_cidr  = "192.168.11.67/24"
+    username = "bigred"
+  }
+
+  db-01 = {
+    vmid      = 616
+    ip_cidr   = "192.168.11.68/24"
     username  = "bigred"
-    cores     = 2      # 選填，預設 4
-    memory_mb = 4096   # 選填，預設 8192
-    disk_gb   = 100    # 選填，預設 50，不能小於範本的磁碟
+    cores     = 2
+    memory_mb = 4096
+    disk_gb   = 100
   }
 }
 ```
 
-每台 VM 各自指定的是 VMID、IP、帳號名稱與規格。閘道、DNS 與 SSH 公鑰是所有 VM 共用的。
+區塊的名稱（`web-01`、`db-01`）就是 VM 在 PVE 上的名稱，也是它的主機名稱。只能使用英文字母、數字與 `-`。
 
-repo 裡附的兩台 `ub2604-ci-test1`、`ub2604-ci-test2` 是驗證用的範例，請換成你要的 VM。`vmid` 和 `ip_cidr` 都不能和現有的機器重複。
+每個區塊裡可以寫的欄位：
+
+| 欄位 | 必填 | 填什麼 |
+|---|---|---|
+| `vmid` | 是 | 沒被使用的 VMID，數字不加引號 |
+| `ip_cidr` | 是 | 這台 VM 的 IP 加上網路遮罩的長度，前後要有雙引號 |
+| `username` | 是 | 登入用的帳號名稱，前後要有雙引號 |
+| `cores` | 否 | CPU 核心數，不寫時是 4 |
+| `memory_mb` | 否 | 記憶體，單位是 MB，不寫時是 8192 |
+| `disk_gb` | 否 | 磁碟大小，單位是 GB，不寫時是 50。不能小於範本的磁碟 |
+
+`vmid` 和 `ip_cidr` 都不能和現有的機器重複，也不能和清單裡其他台重複。閘道、DNS 與 SSH 公鑰是所有 VM 共用的，已經在第 3 章與步驟 4.2 設定好，這裡不用寫。
 
 ### 6.2 每台 VM 的密碼雜湊
 
-設定檔裡不放密碼本身，只放密碼的雜湊（hash，由密碼算出來、無法反推回密碼的字串）。先產生雜湊：
+設定檔裡不放密碼本身，只放密碼的雜湊（hash，由密碼算出來、無法反推回密碼的字串）。
+
+**產生雜湊**
 
 ```bash
 scripts/hash-password.sh
 ```
 
-輸入密碼時螢幕不會顯示任何字元。輸入兩次之後，腳本會印出一行以 `$6$` 開頭、共 106 個字元的字串，這就是雜湊。請從終端機完整複製這一行。
+它會要你輸入兩次密碼，輸入時螢幕不會顯示任何字元：
 
-接著建立密碼雜湊檔：
+```
+Password:
+Again:
+$6$fPZ6p1gbnaRA0u3.$uUSoEOTJy6oenMCd0McqahD.mPJE.YCWAwZG35TFbIiH57HIFLKf.u1zDVAeRYl0XmLmM03sFbpaBMyOVj8nW1
+```
+
+最後一行就是雜湊：以 `$6$` 開頭、共 106 個字元。請從終端機完整複製這一行，不要漏掉頭尾的字元。
+
+清單裡有幾台 VM 就執行幾次，每台各產生一個雜湊。想讓多台用同一組密碼的話，也可以把同一個雜湊填給多台。
+
+**填進設定檔**
+
+從範例檔複製一份，並設成只有自己能讀取：
 
 ```bash
 cp tofu/secrets.auto.tfvars.example tofu/secrets.auto.tfvars
 chmod 600 tofu/secrets.auto.tfvars
 ```
 
-打開它，每台 VM 填一筆，名稱要和 VM 清單一致，值是剛才複製的雜湊：
+用編輯器打開 `tofu/secrets.auto.tfvars`。裡面是範例的兩台 VM，值是空的：
 
 ```hcl
 vm_password_hashes = {
-  web-01 = "這裡貼上 $6$ 開頭的完整雜湊"
+  ub2604-ci-test1 = ""
+  ub2604-ci-test2 = ""
 }
 ```
 
-填入的不是 `$6$` 開頭的雜湊時，下一步會直接報錯，不會把明文密碼送出去。
+把等號左邊的名稱改成 VM 清單裡的名稱，把雜湊貼進雙引號中間。清單裡的每一台都要有一行：
+
+```hcl
+vm_password_hashes = {
+  web-01 = "$6$fPZ6p1gbnaRA0u3.$uUSoEOTJy6oenMCd0McqahD.mPJE.YCWAwZG35TFbIiH57HIFLKf.u1zDVAeRYl0XmLmM03sFbpaBMyOVj8nW1"
+  db-01  = "$6$MQ5nXc/x9UP2JzYt$q32cHWrtPbJUezR9KYikwLAWAJSWvNe9B2GPjwgTh/LFdhMXjMJmYx2xdsRc7cbeDVWtIqqzf5ijHPz1YCH67."
+}
+```
+
+填入的不是 `$6$` 開頭的完整雜湊時，下一章的指令會直接報錯，不會把明文密碼送出去。
 
 ## 7. 建立 VM
 
+建立 VM 分三個指令，依序執行。
+
+### 7.1 初始化
+
 ```bash
-scripts/tofu.sh init    # 初始化，只有第一次需要
-scripts/tofu.sh plan    # 預覽會建立、修改或刪除哪些 VM
-scripts/tofu.sh apply   # 執行，確認後輸入 yes
+scripts/tofu.sh init
 ```
 
-在驗證用的環境裡，每台 VM 大約 1 分鐘。完成時會列出每台 VM 的設定：
+只有第一次需要執行。看到這一行代表成功：
 
 ```
-Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+OpenTofu has been successfully initialized!
+```
+
+### 7.2 預覽
+
+```bash
+scripts/tofu.sh plan
+```
+
+這個指令只會列出打算做的事，不會動到 PVE。輸出裡每台要建立的 VM 是一段 `+` 開頭的內容，最後一行是總數：
+
+```
+Plan: 2 to add, 0 to change, 0 to destroy.
+```
+
+確認 `to add` 的數字等於清單裡的 VM 數量，`to destroy` 是 0。出現錯誤時，常見的原因：
+
+| 錯誤訊息裡的文字 | 原因 | 處理方式 |
+|---|---|---|
+| `Every value must be a SHA-512 crypt hash` | `tofu/secrets.auto.tfvars` 裡有值不是完整的雜湊 | 回到步驟 6.2 重新複製雜湊 |
+| `Invalid index`，並提到 `vm_password_hashes` | 清單裡有 VM 在 `tofu/secrets.auto.tfvars` 找不到同名的一行 | 檢查兩個檔案裡的名稱是否完全相同 |
+| `public key file not found` | 公鑰檔不存在 | 回到步驟 4.2 檢查 `SSH_PUBLIC_KEY_FILE` |
+
+### 7.3 執行
+
+```bash
+scripts/tofu.sh apply
+```
+
+它會再列一次同樣的計畫，然後停在這裡等你確認：
+
+```
+Do you want to perform these actions?
+  OpenTofu will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value:
+```
+
+輸入 `yes` 後按 Enter。在驗證用的環境裡，每台 VM 大約 1 分鐘。完成時會列出每台 VM 的設定：
+
+```
+Apply complete! Resources: 2 added, 0 changed, 0 destroyed.
 
 Outputs:
 
 vms = {
+  "db-01" = {
+    "address" = "192.168.11.68"
+    "username" = "bigred"
+    "vmid" = 616
+  }
   "web-01" = {
     "address" = "192.168.11.67"
     "username" = "bigred"
@@ -427,13 +663,17 @@ vms = {
 }
 ```
 
-這裡顯示的是你設定的 IP。實際連得上才算成功，用金鑰登入確認：
+### 7.4 確認能登入
+
+上面顯示的是你設定的 IP，實際連得上才算成功。用清單裡的 `username` 和 IP 登入：
 
 ```bash
 ssh bigred@192.168.11.67
 ```
 
-再[打開這台 VM 的 Console](#打開-vm-的-console)，用清單裡的 `username` 與步驟 6.2 輸入的原始密碼登入。
+第一次連線會問是否信任這台主機，輸入 `yes`。不用輸入密碼就進入 VM，代表網路、帳號與 SSH 公鑰都設定成功。
+
+再[打開這台 VM 的 Console](#打開-vm-的-console)，用同一個帳號和步驟 6.2 輸入的原始密碼登入，確認密碼也生效。
 
 ## 8. 驗證
 
@@ -477,18 +717,52 @@ Console 上看不看得到登入提示、密碼能不能登入，腳本無法代
 
 ## 日常操作
 
-| 想做的事 | 做法 |
-|---|---|
-| 新增 VM | 在 `tofu/vms.auto.tfvars` 加一個區塊，在 `tofu/secrets.auto.tfvars` 加一筆雜湊，執行 `scripts/tofu.sh apply` |
-| 調整 CPU 或記憶體 | 修改清單裡的數值後執行 `scripts/tofu.sh apply`。在驗證用的環境裡，OpenTofu 會把 VM 重開機讓設定生效 |
-| 加大磁碟 | 修改 `disk_gb` 後執行 `scripts/tofu.sh apply`。在驗證用的環境裡，磁碟會立刻變大，VM 不會重開機。接著把 VM 重開機，或登入後執行 `sudo systemctl start grow-root-lvm`，根目錄就會擴充到新的大小。磁碟只能加大，不能縮小 |
-| 刪除一台 VM | 從清單移除它的區塊，執行 `scripts/tofu.sh apply` |
-| 刪除 OpenTofu 管理的全部 VM | `scripts/tofu.sh destroy`。執行前它會列出要刪除的 VM，請核對後再輸入 yes |
-| 重建範本 | 見下方說明 |
+VM 的新增、調整與刪除都是同一個流程：修改 `tofu/vms.auto.tfvars`，執行 `scripts/tofu.sh plan` 看它打算做什麼，確認無誤後執行 `scripts/tofu.sh apply`。
+
+| 想做的事 | 做法 | `plan` 最後一行應該是 |
+|---|---|---|
+| 新增 VM | 見下方說明 | `1 to add, 0 to change, 0 to destroy` |
+| 調整 CPU 或記憶體 | 修改那台 VM 的 `cores` 或 `memory_mb` | `0 to add, 1 to change, 0 to destroy` |
+| 加大磁碟 | 見下方說明 | `0 to add, 1 to change, 0 to destroy` |
+| 刪除一台 VM | 從清單刪掉它的整個區塊，並刪掉 `tofu/secrets.auto.tfvars` 裡它的那一行 | `0 to add, 0 to change, 1 to destroy` |
+| 刪除 OpenTofu 管理的全部 VM | 執行 `scripts/tofu.sh destroy`，核對它列出的 VM 後再輸入 `yes` | |
+| 重建範本 | 見下方說明 | |
+
+`plan` 顯示的數字和你預期的不同時，先不要執行 `apply`。尤其是出現你沒打算刪除的 `to destroy`，或某台 VM 標示為 `must be replaced`（先刪除再重建，資料會消失）。
+
+在驗證用的環境裡，調整 CPU 或記憶體時 OpenTofu 會把 VM 重開機讓設定生效。
+
+**新增 VM**
+
+1. 在 `tofu/vms.auto.tfvars` 的 `vms = { ... }` 裡加一個區塊，寫法和步驟 6.1 相同。
+2. 執行 `scripts/hash-password.sh` 產生雜湊，在 `tofu/secrets.auto.tfvars` 加一行同名的項目。
+3. 執行 `scripts/tofu.sh plan`，確認後執行 `scripts/tofu.sh apply`。
+
+**加大磁碟**
+
+以 `web-01` 從 50G 加大到 100G 為例。在它的區塊裡加上或修改 `disk_gb`：
+
+```hcl
+  web-01 = {
+    vmid     = 615
+    ip_cidr  = "192.168.11.67/24"
+    username = "bigred"
+    disk_gb  = 100
+  }
+```
+
+執行 `scripts/tofu.sh apply`。在驗證用的環境裡，磁碟會立刻變大，VM 不會重開機，但這時 VM 裡的根目錄還是原本的大小。登入 VM 執行：
+
+```bash
+sudo systemctl start grow-root-lvm
+df -h /
+```
+
+`df` 顯示的 `Size` 接近新的磁碟大小就完成了。不想登入的話，把 VM 重開機也有同樣的效果。磁碟只能加大，不能縮小。
 
 **重建範本**
 
-建置腳本不會覆蓋現有的範本，要先刪除舊的。在 PVE 節點上，先確認那個 VMID 確實是這個專案的範本：
+建置腳本不會覆蓋現有的範本，要先刪除舊的。登入 PVE 節點，先確認那個 VMID 確實是這個專案的範本。把 `605` 換成你的範本 VMID：
 
 ```bash
 qm config 605 | grep -E '^(name|template)'
@@ -499,7 +773,7 @@ name: ub2604-ci-temp
 template: 1
 ```
 
-名稱與 `template: 1` 都符合，才刪除：
+名稱和你在第 3 章設定的 `template_name` 相同，而且有 `template: 1`，才刪除：
 
 ```bash
 qm destroy 605
@@ -533,32 +807,96 @@ qm destroy 605
 
 **把某個目錄分成獨立的 LV**
 
-以 `/var` 分出 15G 為例，在 `storage.config` 清單裡加三段。新的 LV 給固定大小，根目錄的 `ubuntu-lv` 維持 `size: -1`，也就是用掉剩下的全部空間。
+以 `/var` 分出 15G 為例。新的 LV 給固定大小，根目錄的 `ubuntu-lv` 維持 `size: -1`，也就是用掉剩下的全部空間。
 
-第一段要放在 `id: lv-root` 那一段**之前**，因為 `size: -1` 的 LV 必須最後建立：
+用編輯器打開 `packer/files/user-data.pkrtpl.yaml`，找到 `storage:` 底下的 `config:` 清單。清單的後半段原本是這樣：
 
 ```yaml
-      - id: lv-var
+      - id: vg0
+        type: lvm_volgroup
+        name: ubuntu-vg
+        devices:
+          - part-pv
+      - id: lv-root
+        type: lvm_partition
+        volgroup: vg0
+        name: ubuntu-lv
+        size: -1
+      - id: fs-root
+        type: format
+        volume: lv-root
+        fstype: ext4
+      - id: mount-root
+        type: mount
+        device: fs-root
+        path: /
+      - id: mount-boot
+        type: mount
+        device: fs-boot
+        path: /boot
+```
+
+要加入三段，改完後是這樣。標示「新增」的註解只是用來指出位置，不用照抄：
+
+```yaml
+      - id: vg0
+        type: lvm_volgroup
+        name: ubuntu-vg
+        devices:
+          - part-pv
+      - id: lv-var              # 新增：建立 15G 的 LV
         type: lvm_partition
         volgroup: vg0
         name: var-lv
         size: 15G
-```
-
-另外兩段加在清單的最後：
-
-```yaml
-      - id: fs-var
+      - id: lv-root
+        type: lvm_partition
+        volgroup: vg0
+        name: ubuntu-lv
+        size: -1
+      - id: fs-root
+        type: format
+        volume: lv-root
+        fstype: ext4
+      - id: mount-root
+        type: mount
+        device: fs-root
+        path: /
+      - id: mount-boot
+        type: mount
+        device: fs-boot
+        path: /boot
+      - id: fs-var              # 新增：在這個 LV 上建立 ext4
         type: format
         volume: lv-var
         fstype: ext4
-      - id: mount-var
+      - id: mount-var           # 新增：掛載到 /var
         type: mount
         device: fs-var
         path: /var
 ```
 
-改完後要重建範本才會生效。
+三個要注意的地方：
+
+- **`lv-var` 要放在 `lv-root` 之前**。`size: -1` 的 LV 會用掉剩下的全部空間，所以必須最後建立。
+- **縮排要和其他段完全對齊**，而且只能用空白，不能用 Tab。
+- **三段靠 `id` 互相指向**：`fs-var` 的 `volume` 填 `lv-var`，`mount-var` 的 `device` 填 `fs-var`。要分出其他目錄時，把三個 `id`、`name` 與 `path` 換成新的名稱，大小改成你要的值。
+
+改完後要[重建範本](#日常操作)才會生效。建好之後，從新範本建立一台 VM，登入後確認：
+
+```bash
+lsblk -o NAME,SIZE,TYPE,MOUNTPOINTS
+```
+
+```
+NAME                       SIZE TYPE MOUNTPOINTS
+sda                         50G disk
+├─sda1                       1M part
+├─sda2                       2G part /boot
+└─sda3                      48G part
+  ├─ubuntu--vg-var--lv      15G lvm  /var
+  └─ubuntu--vg-ubuntu--lv   33G lvm  /
+```
 
 **修改配置時的限制**
 
@@ -583,10 +921,12 @@ scripts/vm-screenshot.sh 605 screen.png
 
 | 畫面 | 原因 | 處理方式 |
 |---|---|---|
-| 停在安裝光碟的開機選單，或已經進入一般的安裝畫面 | Packer 輸入開機指令的時機不對 | 調整 `packer/variables.pkr.hcl` 的 `boot_wait`。開機選單會停留 30 秒，數值設在選單出現之後、30 秒之內即可 |
+| 停在安裝光碟的開機選單，或已經進入一般的安裝畫面 | Packer 輸入開機指令的時機不對 | 把 `packer/variables.pkr.hcl` 裡 `boot_wait` 的 `"8s"` 改成 `"15s"` 再重新建置。這個值是 VM 開機後等幾秒才開始輸入；開機選單會停留 30 秒，所以要在選單出現之後、30 秒之內 |
 | 出現 `Continue with autoinstall? (yes\|no)` | 核心開機參數缺少 `autoinstall` | 同上 |
 | 安裝程式顯示錯誤 | autoinstall 設定有誤，常見於修改 `storage` 區塊之後 | 檢查 `packer/files/user-data.pkrtpl.yaml` 的縮排，以及各段的 `id` 是否互相對應 |
-| 安裝完成並出現登入提示，Packer 仍在等 SSH | 工作機連不到建置用的 IP | 檢查 `build_ip_cidr`、`build_gateway` 與橋接器設定 |
+| 安裝完成並出現登入提示，Packer 仍在等 SSH | 工作機連不到建置用的 IP | 在工作機上 `ping` 建置用的 IP。不通的話，檢查 `packer/variables.pkr.hcl` 的 `build_ip_cidr`、`build_gateway` 與 `bridge` |
+
+上面的情況處理完後，先按 Ctrl+C 中止還在等待的 `scripts/build-template.sh`，再重新執行。
 
 需要 Packer 的詳細紀錄時：
 
@@ -594,7 +934,7 @@ scripts/vm-screenshot.sh 605 screen.png
 PACKER_LOG=1 scripts/build-template.sh
 ```
 
-建置失敗時，Packer 會嘗試刪除建到一半的 VM。重新執行前，先在 PVE 節點上用 `qm config 605` 確認它已經不存在。
+建置失敗或被中止時，Packer 會嘗試刪除建到一半的 VM。重新執行前，先在 PVE 節點上執行 `qm config 605`，出現 `does not exist` 代表它已經不存在。
 
 **`VMID 605 already exists`**
 
@@ -606,7 +946,10 @@ PACKER_LOG=1 scripts/build-template.sh
 
 **`scripts/tofu.sh apply` 停很久**
 
-VM 開機失敗，或 cloud-init 沒有套用網路設定時，OpenTofu 會一直等到逾時。打開該 VM 的 Console 查看開機畫面。
+VM 開機失敗，或 cloud-init 沒有套用網路設定時，OpenTofu 會一直等到逾時。[打開該 VM 的 Console](#打開-vm-的-console) 查看：
+
+- 畫面停在開機過程或錯誤訊息：範本本身有問題，重建範本。
+- 已經出現登入提示：登入後執行 `ip -br addr`，看 IP 是否和清單裡的 `ip_cidr` 相同。不同的話，檢查 `ip_cidr`、`tofu/variables.tf` 的 `gateway` 與 `bridge`。
 
 ## 不會進 git 的檔案
 
