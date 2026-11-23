@@ -31,4 +31,6 @@ jobs:
           platforms: linux/amd64
           push: true
           provenance: false
+          secrets: |
+            github_token=${{ secrets.GITHUB_TOKEN }}
           tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}

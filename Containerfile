@@ -20,7 +20,12 @@ ENV PACKER_PLUGIN_PATH=/opt/packer/plugins \
 
 # Packer plugin: install the version required by the template.
 COPY base/packer/ubuntu-2604.pkr.hcl /tmp/pin/packer/
-RUN packer init /tmp/pin/packer/ubuntu-2604.pkr.hcl
+# "packer init" asks the GitHub API for the plugin release. Shared CI runners
+# hit the anonymous rate limit, so a token can be passed as a build secret
+# (--secret id=github_token,...). It is optional and is not stored in the image.
+RUN --mount=type=secret,id=github_token \
+    PACKER_GITHUB_API_TOKEN="$(cat /run/secrets/github_token 2>/dev/null || true)" \
+    packer init /tmp/pin/packer/ubuntu-2604.pkr.hcl
 
 # OpenTofu provider: mirror the locked version into the image and make tofu
 # install from that mirror only, so "tofu init" needs no network access.
